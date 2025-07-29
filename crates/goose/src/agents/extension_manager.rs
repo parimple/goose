@@ -12,6 +12,7 @@ use std::sync::Arc;
 use std::sync::LazyLock;
 use std::time::Duration;
 use tempfile::tempdir;
+use tokio::io::AsyncReadExt;
 use tokio::process::Command;
 use tokio::sync::Mutex;
 use tokio::task;
@@ -218,19 +219,48 @@ impl ExtensionManager {
             } => {
                 let all_envs = merge_environments(envs, env_keys, &sanitized_name).await?;
                 let command = Command::new(cmd).configure(|command| {
-                    command.args(args).envs(all_envs).stderr(Stdio::piped());
+                    command.args(args).envs(all_envs);
                 });
-                let transport = TokioChildProcess::new(command)
+                let (transport, mut stderr) = TokioChildProcess::builder(command)
+                    .stderr(Stdio::piped())
+                    .spawn()
                     .map_err(|e| ExtensionError::ClientCreationError(e.to_string()))?;
-                Box::new(
-                    McpClient::connect(
-                        transport,
-                        Duration::from_secs(
-                            timeout.unwrap_or(crate::config::DEFAULT_EXTENSION_TIMEOUT),
-                        ),
-                    )
-                    .await?,
+                let mut stderr = stderr
+                    .take()
+                    .expect("should have a stderr handle because it was requested");
+
+                let stderr_task = tokio::spawn(async move {
+                    let mut all_stderr = Vec::new();
+                    stderr.read_to_end(&mut all_stderr).await?;
+                    Ok::<String, std::io::Error>(String::from_utf8_lossy(&all_stderr).into())
+                });
+
+                let client_result = McpClient::connect(
+                    transport,
+                    Duration::from_secs(
+                        timeout.unwrap_or(crate::config::DEFAULT_EXTENSION_TIMEOUT),
+                    ),
                 )
+                .await;
+
+                let client = match client_result {
+                    Ok(client) => Ok(client),
+                    Err(error) => {
+                        let error_task_out = stderr_task
+                            .await
+                            .map_err(|e| ExtensionError::ClientCreationError(e.to_string()))?;
+
+                        Err(match error_task_out {
+                            Ok(stderr_content) => ExtensionError::ClientCreationError(format!(
+                                "Process quit: {}. Stderr: {}",
+                                error, stderr_content
+                            )),
+                            Err(e) => ExtensionError::ClientCreationError(e.to_string()),
+                        })
+                    }
+                }?;
+
+                Box::new(client)
             }
             ExtensionConfig::Builtin {
                 name,
