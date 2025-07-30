@@ -217,6 +217,9 @@ This project follows the [Conventional Commits](https://www.conventionalcommits.
 [nvm]: https://github.com/nvm-sh/nvm
 [just]: https://github.com/casey/just?tab=readme-ov-file#installation
 
+## Developer Certificate of Origin
+
+This project requires [Developer Certificate of Origin](https://en.wikipedia.org/wiki/Developer_Certificate_of_Origin) sign-offs on all commits. Before committing, make sure you understand what the Developer Certificate of Origin is. When you are ready to commit, use the `--signoff` flag (`git commit --signoff ...`) to attach the sign-off to your commit. PRs with commits that are missing DCO sign-offs will not be accepted.
 
 ## Other Ways to Contribute
 
