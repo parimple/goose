@@ -9,10 +9,11 @@ use crate::{
 };
 use anyhow::anyhow;
 use chrono::{DateTime, Utc};
-use mcp_core::handler::ToolError;
+use mcp_core::handler::ErrorData;
 use rmcp::model::Tool;
 use serde::{Deserialize, Serialize};
 // use serde_json::{self};
+use std::borrow::Cow;
 use std::{collections::HashMap, sync::Arc};
 use tokio::sync::{Mutex, RwLock};
 use tracing::{debug, error, instrument};
@@ -201,7 +202,11 @@ impl SubAgent {
                                 .await
                             {
                                 Ok(result) => result.result.await,
-                                Err(e) => Err(ToolError::ExecutionError(e.to_string())),
+                                Err(e) => Err(ErrorData {
+            code: ErrorCode::INTERNAL_ERROR,
+            message: Cow::from(e.to_string(),
+            data: None,
+        })),
                             };
 
                             match tool_result {
@@ -215,7 +220,11 @@ impl SubAgent {
                                     // Create a user message with the tool error
                                     let tool_error_message = Message::user().with_tool_response(
                                         request.id.clone(),
-                                        Err(ToolError::ExecutionError(e.to_string())),
+                                        Err(ErrorData {
+            code: ErrorCode::INTERNAL_ERROR,
+            message: Cow::from(e.to_string(),
+            data: None,
+        })),
                                     );
                                     messages.push(tool_error_message);
                                 }

@@ -4,8 +4,9 @@ use crate::providers::base::Usage;
 use crate::providers::errors::ProviderError;
 use anyhow::{anyhow, Result};
 use mcp_core::tool::ToolCall;
-use rmcp::model::{Role, Tool};
+use rmcp::model::{Role, Tool, ErrorData, ErrorCode};
 use serde_json::{json, Value};
+use std::borrow::Cow;
 use std::collections::HashSet;
 
 // Constants for frequently used strings in Anthropic API format
@@ -572,8 +573,12 @@ where
                                     Ok(parsed) => parsed,
                                     Err(_) => {
                                         // If parsing fails, create an error tool request
-                                        let error = mcp_core::handler::ToolError::InvalidParameters(
-                                            format!("Could not parse tool arguments: {}", args)
+                                        let error = mcp_core::handler::ErrorData {
+                code: ErrorCode::INVALID_PARAMS,
+                message: Cow::from(
+                                            format!("Could not parse tool arguments: {}", args),
+                data: None,
+            }
                                         );
                                         let mut message = Message::new(
                                             Role::Assistant,
@@ -983,7 +988,7 @@ mod tests {
 
     #[test]
     fn test_tool_error_handling_maintains_pairing() {
-        use mcp_core::handler::ToolError;
+        use mcp_core::handler::ErrorData;
 
         let messages = vec![
             Message::assistant().with_tool_request(
@@ -992,7 +997,11 @@ mod tests {
             ),
             Message::user().with_tool_response(
                 "tool_1",
-                Err(ToolError::ExecutionError("Tool failed".to_string())),
+                Err(ErrorData {
+                code: ErrorCode::INTERNAL_ERROR,
+                message: Cow::from("Tool failed".to_string(),
+                data: None,
+            })),
             ),
         ];
 

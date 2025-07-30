@@ -3,10 +3,11 @@
 //! This module contains all the handlers for the schedule management platform tool,
 //! including job creation, execution, monitoring, and session management.
 
+use std::borrow::Cow;
 use std::sync::Arc;
 
 use chrono::Utc;
-use mcp_core::{ToolError, ToolResult};
+use mcp_core::{ErrorData, ToolResult};
 use rmcp::model::Content;
 
 use crate::recipe::Recipe;
@@ -24,8 +25,12 @@ impl Agent {
         let scheduler = match self.scheduler_service.lock().await.as_ref() {
             Some(s) => s.clone(),
             None => {
-                return Err(ToolError::ExecutionError(
+                return Err(ErrorData {
+                code: ErrorCode::INTERNAL_ERROR,
+                message: Cow::from(
                     "Scheduler not available. This tool only works in server mode.".to_string(),
+                data: None,
+            },
                 ))
             }
         };
@@ -33,7 +38,11 @@ impl Agent {
         let action = arguments
             .get("action")
             .and_then(|v| v.as_str())
-            .ok_or_else(|| ToolError::ExecutionError("Missing 'action' parameter".to_string()))?;
+            .ok_or_else(|| ErrorData {
+                code: ErrorCode::INTERNAL_ERROR,
+                message: Cow::from("Missing 'action' parameter".to_string(),
+                data: None,
+            }))?;
 
         match action {
             "list" => self.handle_list_jobs(scheduler).await,
@@ -46,10 +55,14 @@ impl Agent {
             "inspect" => self.handle_inspect_job(scheduler, arguments).await,
             "sessions" => self.handle_list_sessions(scheduler, arguments).await,
             "session_content" => self.handle_session_content(arguments).await,
-            _ => Err(ToolError::ExecutionError(format!(
+            _ => Err(ErrorData {
+                code: ErrorCode::INTERNAL_ERROR,
+                message: Cow::from(format!(
                 "Unknown action: {}",
                 action
-            ))),
+            ),
+                data: None,
+            })),
         }
     }
 
@@ -61,17 +74,25 @@ impl Agent {
         match scheduler.list_scheduled_jobs().await {
             Ok(jobs) => {
                 let jobs_json = serde_json::to_string_pretty(&jobs).map_err(|e| {
-                    ToolError::ExecutionError(format!("Failed to serialize jobs: {}", e))
+                    ErrorData {
+                code: ErrorCode::INTERNAL_ERROR,
+                message: Cow::from(format!("Failed to serialize jobs: {}", e),
+                data: None,
+            })
                 })?;
                 Ok(vec![Content::text(format!(
                     "Scheduled Jobs:\n{}",
                     jobs_json
                 ))])
             }
-            Err(e) => Err(ToolError::ExecutionError(format!(
+            Err(e) => Err(ErrorData {
+                code: ErrorCode::INTERNAL_ERROR,
+                message: Cow::from(format!(
                 "Failed to list jobs: {}",
                 e
-            ))),
+            ),
+                data: None,
+            })),
         }
     }
 
@@ -85,14 +106,22 @@ impl Agent {
             .get("recipe_path")
             .and_then(|v| v.as_str())
             .ok_or_else(|| {
-                ToolError::ExecutionError("Missing 'recipe_path' parameter".to_string())
+                ErrorData {
+                code: ErrorCode::INTERNAL_ERROR,
+                message: Cow::from("Missing 'recipe_path' parameter".to_string(),
+                data: None,
+            })
             })?;
 
         let cron_expression = arguments
             .get("cron_expression")
             .and_then(|v| v.as_str())
             .ok_or_else(|| {
-                ToolError::ExecutionError("Missing 'cron_expression' parameter".to_string())
+                ErrorData {
+                code: ErrorCode::INTERNAL_ERROR,
+                message: Cow::from("Missing 'cron_expression' parameter".to_string(),
+                data: None,
+            })
             })?;
 
         // Get the execution_mode parameter, defaulting to "background" if not provided
@@ -103,18 +132,26 @@ impl Agent {
 
         // Validate execution_mode is either "foreground" or "background"
         if execution_mode != "foreground" && execution_mode != "background" {
-            return Err(ToolError::ExecutionError(format!(
+            return Err(ErrorData {
+                code: ErrorCode::INTERNAL_ERROR,
+                message: Cow::from(format!(
                 "Invalid execution_mode: {}. Must be 'foreground' or 'background'",
                 execution_mode
-            )));
+            ),
+                data: None,
+            }));
         }
 
         // Validate recipe file exists and is readable
         if !std::path::Path::new(recipe_path).exists() {
-            return Err(ToolError::ExecutionError(format!(
+            return Err(ErrorData {
+                code: ErrorCode::INTERNAL_ERROR,
+                message: Cow::from(format!(
                 "Recipe file not found: {}",
                 recipe_path
-            )));
+            ),
+                data: None,
+            }));
         }
 
         // Validate it's a valid recipe by trying to parse it
@@ -122,19 +159,31 @@ impl Agent {
             Ok(content) => {
                 if recipe_path.ends_with(".json") {
                     serde_json::from_str::<Recipe>(&content).map_err(|e| {
-                        ToolError::ExecutionError(format!("Invalid JSON recipe: {}", e))
+                        ErrorData {
+                code: ErrorCode::INTERNAL_ERROR,
+                message: Cow::from(format!("Invalid JSON recipe: {}", e),
+                data: None,
+            })
                     })?;
                 } else {
                     serde_yaml::from_str::<Recipe>(&content).map_err(|e| {
-                        ToolError::ExecutionError(format!("Invalid YAML recipe: {}", e))
+                        ErrorData {
+                code: ErrorCode::INTERNAL_ERROR,
+                message: Cow::from(format!("Invalid YAML recipe: {}", e),
+                data: None,
+            })
                     })?;
                 }
             }
             Err(e) => {
-                return Err(ToolError::ExecutionError(format!(
+                return Err(ErrorData {
+                code: ErrorCode::INTERNAL_ERROR,
+                message: Cow::from(format!(
                     "Cannot read recipe file: {}",
                     e
-                )))
+                ),
+                data: None,
+            }))
             }
         }
 
@@ -158,10 +207,14 @@ impl Agent {
                 "Successfully created scheduled job '{}' for recipe '{}' with cron expression '{}' in {} mode",
                 job_id, recipe_path, cron_expression, execution_mode
             ))]),
-            Err(e) => Err(ToolError::ExecutionError(format!(
+            Err(e) => Err(ErrorData {
+                code: ErrorCode::INTERNAL_ERROR,
+                message: Cow::from(format!(
                 "Failed to create job: {}",
                 e
-            ))),
+            ),
+                data: None,
+            })),
         }
     }
 
@@ -174,17 +227,25 @@ impl Agent {
         let job_id = arguments
             .get("job_id")
             .and_then(|v| v.as_str())
-            .ok_or_else(|| ToolError::ExecutionError("Missing 'job_id' parameter".to_string()))?;
+            .ok_or_else(|| ErrorData {
+                code: ErrorCode::INTERNAL_ERROR,
+                message: Cow::from("Missing 'job_id' parameter".to_string(),
+                data: None,
+            }))?;
 
         match scheduler.run_now(job_id).await {
             Ok(session_id) => Ok(vec![Content::text(format!(
                 "Successfully started job '{}'. Session ID: {}",
                 job_id, session_id
             ))]),
-            Err(e) => Err(ToolError::ExecutionError(format!(
+            Err(e) => Err(ErrorData {
+                code: ErrorCode::INTERNAL_ERROR,
+                message: Cow::from(format!(
                 "Failed to run job: {}",
                 e
-            ))),
+            ),
+                data: None,
+            })),
         }
     }
 
@@ -197,17 +258,25 @@ impl Agent {
         let job_id = arguments
             .get("job_id")
             .and_then(|v| v.as_str())
-            .ok_or_else(|| ToolError::ExecutionError("Missing 'job_id' parameter".to_string()))?;
+            .ok_or_else(|| ErrorData {
+                code: ErrorCode::INTERNAL_ERROR,
+                message: Cow::from("Missing 'job_id' parameter".to_string(),
+                data: None,
+            }))?;
 
         match scheduler.pause_schedule(job_id).await {
             Ok(()) => Ok(vec![Content::text(format!(
                 "Successfully paused job '{}'",
                 job_id
             ))]),
-            Err(e) => Err(ToolError::ExecutionError(format!(
+            Err(e) => Err(ErrorData {
+                code: ErrorCode::INTERNAL_ERROR,
+                message: Cow::from(format!(
                 "Failed to pause job: {}",
                 e
-            ))),
+            ),
+                data: None,
+            })),
         }
     }
 
@@ -220,17 +289,25 @@ impl Agent {
         let job_id = arguments
             .get("job_id")
             .and_then(|v| v.as_str())
-            .ok_or_else(|| ToolError::ExecutionError("Missing 'job_id' parameter".to_string()))?;
+            .ok_or_else(|| ErrorData {
+                code: ErrorCode::INTERNAL_ERROR,
+                message: Cow::from("Missing 'job_id' parameter".to_string(),
+                data: None,
+            }))?;
 
         match scheduler.unpause_schedule(job_id).await {
             Ok(()) => Ok(vec![Content::text(format!(
                 "Successfully unpaused job '{}'",
                 job_id
             ))]),
-            Err(e) => Err(ToolError::ExecutionError(format!(
+            Err(e) => Err(ErrorData {
+                code: ErrorCode::INTERNAL_ERROR,
+                message: Cow::from(format!(
                 "Failed to unpause job: {}",
                 e
-            ))),
+            ),
+                data: None,
+            })),
         }
     }
 
@@ -243,17 +320,25 @@ impl Agent {
         let job_id = arguments
             .get("job_id")
             .and_then(|v| v.as_str())
-            .ok_or_else(|| ToolError::ExecutionError("Missing 'job_id' parameter".to_string()))?;
+            .ok_or_else(|| ErrorData {
+                code: ErrorCode::INTERNAL_ERROR,
+                message: Cow::from("Missing 'job_id' parameter".to_string(),
+                data: None,
+            }))?;
 
         match scheduler.remove_scheduled_job(job_id).await {
             Ok(()) => Ok(vec![Content::text(format!(
                 "Successfully deleted job '{}'",
                 job_id
             ))]),
-            Err(e) => Err(ToolError::ExecutionError(format!(
+            Err(e) => Err(ErrorData {
+                code: ErrorCode::INTERNAL_ERROR,
+                message: Cow::from(format!(
                 "Failed to delete job: {}",
                 e
-            ))),
+            ),
+                data: None,
+            })),
         }
     }
 
@@ -266,17 +351,25 @@ impl Agent {
         let job_id = arguments
             .get("job_id")
             .and_then(|v| v.as_str())
-            .ok_or_else(|| ToolError::ExecutionError("Missing 'job_id' parameter".to_string()))?;
+            .ok_or_else(|| ErrorData {
+                code: ErrorCode::INTERNAL_ERROR,
+                message: Cow::from("Missing 'job_id' parameter".to_string(),
+                data: None,
+            }))?;
 
         match scheduler.kill_running_job(job_id).await {
             Ok(()) => Ok(vec![Content::text(format!(
                 "Successfully killed running job '{}'",
                 job_id
             ))]),
-            Err(e) => Err(ToolError::ExecutionError(format!(
+            Err(e) => Err(ErrorData {
+                code: ErrorCode::INTERNAL_ERROR,
+                message: Cow::from(format!(
                 "Failed to kill job: {}",
                 e
-            ))),
+            ),
+                data: None,
+            })),
         }
     }
 
@@ -289,7 +382,11 @@ impl Agent {
         let job_id = arguments
             .get("job_id")
             .and_then(|v| v.as_str())
-            .ok_or_else(|| ToolError::ExecutionError("Missing 'job_id' parameter".to_string()))?;
+            .ok_or_else(|| ErrorData {
+                code: ErrorCode::INTERNAL_ERROR,
+                message: Cow::from("Missing 'job_id' parameter".to_string(),
+                data: None,
+            }))?;
 
         match scheduler.get_running_job_info(job_id).await {
             Ok(Some((session_id, start_time))) => {
@@ -303,10 +400,14 @@ impl Agent {
                 "Job '{}' is not currently running",
                 job_id
             ))]),
-            Err(e) => Err(ToolError::ExecutionError(format!(
+            Err(e) => Err(ErrorData {
+                code: ErrorCode::INTERNAL_ERROR,
+                message: Cow::from(format!(
                 "Failed to inspect job: {}",
                 e
-            ))),
+            ),
+                data: None,
+            })),
         }
     }
 
@@ -319,7 +420,11 @@ impl Agent {
         let job_id = arguments
             .get("job_id")
             .and_then(|v| v.as_str())
-            .ok_or_else(|| ToolError::ExecutionError("Missing 'job_id' parameter".to_string()))?;
+            .ok_or_else(|| ErrorData {
+                code: ErrorCode::INTERNAL_ERROR,
+                message: Cow::from("Missing 'job_id' parameter".to_string(),
+                data: None,
+            }))?;
 
         let limit = arguments
             .get("limit")
@@ -353,10 +458,14 @@ impl Agent {
                     ))])
                 }
             }
-            Err(e) => Err(ToolError::ExecutionError(format!(
+            Err(e) => Err(ErrorData {
+                code: ErrorCode::INTERNAL_ERROR,
+                message: Cow::from(format!(
                 "Failed to list sessions: {}",
                 e
-            ))),
+            ),
+                data: None,
+            })),
         }
     }
 
@@ -369,7 +478,11 @@ impl Agent {
             .get("session_id")
             .and_then(|v| v.as_str())
             .ok_or_else(|| {
-                ToolError::ExecutionError("Missing 'session_id' parameter".to_string())
+                ErrorData {
+                code: ErrorCode::INTERNAL_ERROR,
+                message: Cow::from("Missing 'session_id' parameter".to_string(),
+                data: None,
+            })
             })?;
 
         // Get the session file path
@@ -378,29 +491,41 @@ impl Agent {
         ) {
             Ok(path) => path,
             Err(e) => {
-                return Err(ToolError::ExecutionError(format!(
+                return Err(ErrorData {
+                code: ErrorCode::INTERNAL_ERROR,
+                message: Cow::from(format!(
                     "Invalid session ID '{}': {}",
                     session_id, e
-                )));
+                ),
+                data: None,
+            }));
             }
         };
 
         // Check if session file exists
         if !session_path.exists() {
-            return Err(ToolError::ExecutionError(format!(
+            return Err(ErrorData {
+                code: ErrorCode::INTERNAL_ERROR,
+                message: Cow::from(format!(
                 "Session '{}' not found",
                 session_id
-            )));
+            ),
+                data: None,
+            }));
         }
 
         // Read session metadata
         let metadata = match crate::session::storage::read_metadata(&session_path) {
             Ok(metadata) => metadata,
             Err(e) => {
-                return Err(ToolError::ExecutionError(format!(
+                return Err(ErrorData {
+                code: ErrorCode::INTERNAL_ERROR,
+                message: Cow::from(format!(
                     "Failed to read session metadata: {}",
                     e
-                )));
+                ),
+                data: None,
+            }));
             }
         };
 
@@ -408,10 +533,14 @@ impl Agent {
         let messages = match crate::session::storage::read_messages(&session_path) {
             Ok(messages) => messages,
             Err(e) => {
-                return Err(ToolError::ExecutionError(format!(
+                return Err(ErrorData {
+                code: ErrorCode::INTERNAL_ERROR,
+                message: Cow::from(format!(
                     "Failed to read session messages: {}",
                     e
-                )));
+                ),
+                data: None,
+            }));
             }
         };
 
@@ -419,20 +548,28 @@ impl Agent {
         let metadata_json = match serde_json::to_string_pretty(&metadata) {
             Ok(json) => json,
             Err(e) => {
-                return Err(ToolError::ExecutionError(format!(
+                return Err(ErrorData {
+                code: ErrorCode::INTERNAL_ERROR,
+                message: Cow::from(format!(
                     "Failed to serialize metadata: {}",
                     e
-                )));
+                ),
+                data: None,
+            }));
             }
         };
 
         let messages_json = match serde_json::to_string_pretty(&messages) {
             Ok(json) => json,
             Err(e) => {
-                return Err(ToolError::ExecutionError(format!(
+                return Err(ErrorData {
+                code: ErrorCode::INTERNAL_ERROR,
+                message: Cow::from(format!(
                     "Failed to serialize messages: {}",
                     e
-                )));
+                ),
+                data: None,
+            }));
             }
         };
 

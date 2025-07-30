@@ -12,10 +12,10 @@ use rmcp::model::ResourceContents;
 use rmcp::model::Role;
 use rmcp::model::{
     AnnotateAble, Content, ImageContent, PromptMessage, PromptMessageContent, PromptMessageRole,
-    RawContent, RawImageContent, RawTextContent, TextContent,
-};
+    RawContent, RawImageContent, RawTextContent, TextContent,, ErrorData, ErrorCode};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use std::borrow::Cow;
 use std::collections::HashSet;
 use std::fmt;
 use utoipa::ToSchema;
@@ -581,8 +581,8 @@ impl Message {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use mcp_core::handler::ToolError;
-    use rmcp::model::{PromptMessage, PromptMessageContent, RawEmbeddedResource, ResourceContents};
+    use mcp_core::handler::ErrorData;
+    use rmcp::model::{PromptMessage, PromptMessageContent, RawEmbeddedResource, ResourceContents, ErrorData, ErrorCode};
     use serde_json::{json, Value};
 
     #[test]
@@ -629,8 +629,12 @@ mod tests {
     fn test_error_serialization() {
         let message = Message::assistant().with_tool_request(
             "tool123",
-            Err(ToolError::ExecutionError(
+            Err(ErrorData {
+                code: ErrorCode::INTERNAL_ERROR,
+                message: Cow::from(
                 "Something went wrong".to_string(),
+                data: None,
+            },
             )),
         );
 

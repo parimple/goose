@@ -10,6 +10,7 @@ mod thinking;
 use crate::session::task_execution_display::{
     format_task_execution_notification, TASK_EXECUTION_NOTIFICATION_TYPE,
 };
+use std::borrow::Cow;
 use std::io::Write;
 
 pub use self::export::message_to_markdown;
@@ -35,7 +36,7 @@ use goose::message::{Message, MessageContent};
 use goose::providers::pricing::initialize_pricing_cache;
 use goose::session;
 use input::InputResult;
-use mcp_core::handler::ToolError;
+use mcp_core::handler::ErrorData;
 use rmcp::model::PromptMessage;
 use rmcp::model::ServerNotification;
 
@@ -906,7 +907,11 @@ impl Session {
                                     let mut response_message = Message::user();
                                     response_message.content.push(MessageContent::tool_response(
                                         confirmation.id.clone(),
-                                        Err(ToolError::ExecutionError("Tool call cancelled by user".to_string()))
+                                        Err(ErrorData {
+                                            code: ErrorCode::INTERNAL_ERROR,
+                                            message: Cow::from("Tool call cancelled by user".to_string()),
+                                            data: None,
+                                        })
                                     ));
                                     push_message(&mut self.messages, response_message);
                                     if let Some(session_file) = &self.session_file {
@@ -1216,7 +1221,11 @@ impl Session {
             for (req_id, _) in &tool_requests {
                 response_message.content.push(MessageContent::tool_response(
                     req_id.clone(),
-                    Err(ToolError::ExecutionError(notification.clone())),
+                    Err(ErrorData {
+                        code: ErrorCode::INTERNAL_ERROR,
+                        message: Cow::from(notification.clone()),
+                        data: None,
+                    }),
                 ));
             }
             self.push_message(response_message);
