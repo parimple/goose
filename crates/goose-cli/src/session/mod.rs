@@ -10,13 +10,13 @@ mod thinking;
 use crate::session::task_execution_display::{
     format_task_execution_notification, TASK_EXECUTION_NOTIFICATION_TYPE,
 };
+use goose::conversation::Conversation;
 use std::io::Write;
 
 pub use self::export::message_to_markdown;
 pub use builder::{build_session, SessionBuilderConfig, SessionSettings};
 use console::Color;
 use goose::agents::AgentEvent;
-use goose::message::push_message;
 use goose::permission::permission_confirmation::PrincipalType;
 use goose::permission::Permission;
 use goose::permission::PermissionConfirmation;
@@ -134,11 +134,11 @@ impl Session {
         let messages = if let Some(session_file) = &session_file {
             session::read_messages(session_file).unwrap_or_else(|e| {
                 eprintln!("Warning: Failed to load message history: {}", e);
-                Vec::new()
+                Conversation::new_unvalidated(Vec::new())
             })
         } else {
             // Don't try to read messages if we're not saving sessions
-            Vec::new()
+            Conversation::new_unvalidated(Vec::new())
         };
 
         Session {
@@ -162,7 +162,7 @@ impl Session {
         message_suffix: &str,
     ) -> Result<()> {
         // Summarize messages to fit within context length
-        let (summarized_messages, _) = agent.summarize_context(messages).await?;
+        let (summarized_messages, _) = agent.summarize_context(messages.messages()).await?;
         let msg = format!("Context maxed out\n{}\n{}", "-".repeat(50), message_suffix);
         output::render_text(&msg, Some(Color::Yellow), true);
         *messages = summarized_messages;
@@ -379,7 +379,7 @@ impl Session {
 
             session::persist_messages_with_schedule_id(
                 session_file,
-                &self.messages,
+                self.messages.messages(),
                 Some(provider),
                 self.scheduled_job_id.clone(),
                 working_dir,
@@ -505,7 +505,7 @@ impl Session {
 
                                 session::persist_messages_with_schedule_id(
                                     session_file,
-                                    &self.messages,
+                                    self.messages.messages(),
                                     Some(provider),
                                     self.scheduled_job_id.clone(),
                                     working_dir,
@@ -713,7 +713,7 @@ impl Session {
 
                         // Call the summarize_context method which uses the summarize_messages function
                         let (summarized_messages, _) =
-                            self.agent.summarize_context(&self.messages).await?;
+                            self.agent.summarize_context(self.messages.messages()).await?;
 
                         // Update the session messages with the summarized ones
                         self.messages = summarized_messages;
@@ -723,7 +723,7 @@ impl Session {
                             let working_dir = std::env::current_dir().ok();
                             session::persist_messages_with_schedule_id(
                                 session_file,
-                                &self.messages,
+                                self.messages.messages(),
                                 Some(provider),
                                 self.scheduled_job_id.clone(),
                                 working_dir,
@@ -769,7 +769,7 @@ impl Session {
     ) -> Result<(), anyhow::Error> {
         let plan_prompt = self.agent.get_plan_prompt().await?;
         output::show_thinking();
-        let (plan_response, _usage) = reasoner.complete(&plan_prompt, &plan_messages, &[]).await?;
+        let (plan_response, _usage) = reasoner.complete(&plan_prompt, plan_messages.messages(), &[]).await?;
         output::render_message(&plan_response, self.debug);
         output::hide_thinking();
         let planner_response_type =
@@ -862,7 +862,7 @@ impl Session {
         });
         let mut stream = self
             .agent
-            .reply(&self.messages, session_config.clone(), Some(cancel_token))
+            .reply(self.messages.clone(), session_config.clone(), Some(cancel_token))
             .await?;
 
         let mut progress_bars = output::McpSpinners::new();
@@ -908,12 +908,12 @@ impl Session {
                                         confirmation.id.clone(),
                                         Err(ToolError::ExecutionError("Tool call cancelled by user".to_string()))
                                     ));
-                                    push_message(&mut self.messages, response_message);
+                                    self.messages.push(response_message);
                                     if let Some(session_file) = &self.session_file {
                                         let working_dir = std::env::current_dir().ok();
                                         session::persist_messages_with_schedule_id(
                                             session_file,
-                                            &self.messages,
+                                            self.messages.messages(),
                                             None,
                                             self.scheduled_job_id.clone(),
                                             working_dir,
@@ -970,7 +970,7 @@ impl Session {
                                     }
                                     "truncate" => {
                                         // Truncate messages to fit within context length
-                                        let (truncated_messages, _) = self.agent.truncate_context(&self.messages).await?;
+                                        let (truncated_messages, _) = self.agent.truncate_context(self.messages.messages()).await?;
                                         let msg = if context_strategy == "truncate" {
                                             format!("Context maxed out - automatically truncated messages.\n{}\nGoose tried its best to truncate messages for you.", "-".repeat(50))
                                         } else {
@@ -1000,7 +1000,7 @@ impl Session {
                                 stream = self
                                     .agent
                                     .reply(
-                                        &self.messages,
+                                        self.messages.clone(),
                                         session_config.clone(),
                                         None
                                     )
@@ -1008,14 +1008,14 @@ impl Session {
                             }
                             // otherwise we have a model/tool to render
                             else {
-                                push_message(&mut self.messages, message.clone());
+                                self.messages.push(message.clone());
 
                                 // No need to update description on assistant messages
                                 if let Some(session_file) = &self.session_file {
                                     let working_dir = std::env::current_dir().ok();
                                     session::persist_messages_with_schedule_id(
                                         session_file,
-                                        &self.messages,
+                                        self.messages.messages(),
                                         None,
                                         self.scheduled_job_id.clone(),
                                         working_dir,
@@ -1226,7 +1226,7 @@ impl Session {
                 let working_dir = std::env::current_dir().ok();
                 session::persist_messages_with_schedule_id(
                     session_file,
-                    &self.messages,
+                    self.messages.messages(),
                     None,
                     self.scheduled_job_id.clone(),
                     working_dir,
@@ -1245,7 +1245,7 @@ impl Session {
                 let working_dir = std::env::current_dir().ok();
                 session::persist_messages_with_schedule_id(
                     session_file,
-                    &self.messages,
+                    self.messages.messages(),
                     None,
                     self.scheduled_job_id.clone(),
                     working_dir,
@@ -1269,7 +1269,7 @@ impl Session {
                                 let working_dir = std::env::current_dir().ok();
                                 session::persist_messages_with_schedule_id(
                                     session_file,
-                                    &self.messages,
+                                    self.messages.messages(),
                                     None,
                                     self.scheduled_job_id.clone(),
                                     working_dir,
@@ -1362,7 +1362,7 @@ impl Session {
         );
 
         // Render each message
-        for message in &self.messages {
+        for message in self.messages.iter() {
             output::render_message(message, self.debug);
         }
 
@@ -1541,7 +1541,7 @@ impl Session {
     }
 
     fn push_message(&mut self, message: Message) {
-        push_message(&mut self.messages, message);
+        self.messages.push(message);
     }
 }
 

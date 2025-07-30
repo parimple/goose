@@ -1,6 +1,6 @@
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
-use goose::message::Message;
+use goose::conversation::Conversation;
 
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;

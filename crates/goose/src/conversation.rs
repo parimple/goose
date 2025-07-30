@@ -62,6 +62,10 @@ impl Conversation {
         self.messages.last()
     }
 
+    pub fn first(&self) -> Option<&Message> {
+        self.messages.first()
+    }
+
     pub fn len(&self) -> usize {
         self.messages.len()
     }
@@ -85,6 +89,18 @@ impl Conversation {
 
     pub fn iter(&self) -> std::slice::Iter<Message> {
         self.messages.iter()
+    }
+
+    pub fn pop(&mut self) -> Option<Message> {
+        self.messages.pop()
+    }
+
+    pub fn truncate(&mut self, len: usize) {
+        self.messages.truncate(len);
+    }
+
+    pub fn clear(&mut self) {
+        self.messages.clear();
     }
 
     fn validate(self) -> Result<Self, InvalidConversation> {

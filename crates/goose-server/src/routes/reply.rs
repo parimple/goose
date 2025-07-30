@@ -11,7 +11,8 @@ use bytes::Bytes;
 use futures::{stream::StreamExt, Stream};
 use goose::{
     agents::{AgentEvent, SessionConfig},
-    message::{push_message, Message},
+    conversation::Conversation,
+    message::Message,
     permission::permission_confirmation::PrincipalType,
 };
 use goose::{
@@ -160,7 +161,7 @@ async fn reply_handler(
         };
 
         let mut stream = match agent
-            .reply(&messages, Some(session_config), Some(task_cancel.clone()))
+            .reply(messages.clone(), Some(session_config), Some(task_cancel.clone()))
             .await
         {
             Ok(stream) => stream,
@@ -203,7 +204,7 @@ async fn reply_handler(
             response = timeout(Duration::from_millis(500), stream.next()) => {
                                 match response {
                                     Ok(Some(Ok(AgentEvent::Message(message)))) => {
-                                        push_message(&mut all_messages, message.clone());
+                                        all_messages.push(message.clone());
                                         if let Err(e) = stream_event(MessageEvent::Message { message }, &tx).await {
                                             tracing::error!("Error sending message through channel: {}", e);
                                             let _ = stream_event(
@@ -271,7 +272,7 @@ async fn reply_handler(
                 tokio::spawn(async move {
                     if let Err(e) = session::persist_messages(
                         &session_path,
-                        &all_messages,
+                        all_messages.messages(),
                         Some(provider),
                         Some(PathBuf::from(&session_working_dir)),
                     )

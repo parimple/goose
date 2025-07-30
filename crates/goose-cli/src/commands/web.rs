@@ -10,6 +10,7 @@ use axum::{
 };
 use futures::{sink::SinkExt, stream::StreamExt};
 use goose::agents::{Agent, AgentEvent};
+use goose::conversation::Conversation;
 use goose::message::Message as GooseMessage;
 use goose::session;
 use serde::{Deserialize, Serialize};
@@ -18,7 +19,7 @@ use tokio::sync::{Mutex, RwLock};
 use tower_http::cors::{Any, CorsLayer};
 use tracing::error;
 
-type SessionStore = Arc<RwLock<std::collections::HashMap<String, Arc<Mutex<Vec<GooseMessage>>>>>>;
+type SessionStore = Arc<RwLock<std::collections::HashMap<String, Arc<Mutex<Conversation>>>>>;
 type CancellationStore = Arc<RwLock<std::collections::HashMap<String, tokio::task::AbortHandle>>>;
 
 #[derive(Clone)]
@@ -320,7 +321,7 @@ async fn handle_socket(socket: WebSocket, state: AppState) {
 
                                     // Load existing messages from JSONL file if it exists
                                     let existing_messages = session::read_messages(&session_file)
-                                        .unwrap_or_else(|_| Vec::new());
+                                        .unwrap_or_else(|_| Conversation::new_unvalidated(Vec::new()));
 
                                     let new_session = Arc::new(Mutex::new(existing_messages));
                                     sessions.insert(session_id.clone(), new_session.clone());
@@ -435,7 +436,7 @@ async fn handle_socket(socket: WebSocket, state: AppState) {
 
 async fn process_message_streaming(
     agent: &Agent,
-    session_messages: Arc<Mutex<Vec<GooseMessage>>>,
+    session_messages: Arc<Mutex<Conversation>>,
     session_file: std::path::PathBuf,
     content: String,
     sender: Arc<Mutex<futures::stream::SplitSink<WebSocket, Message>>>,
@@ -449,7 +450,7 @@ async fn process_message_streaming(
     let user_message = GooseMessage::user().with_text(content.clone());
 
     // Get existing messages from session and add the new user message
-    let mut messages = {
+    let mut messages: Conversation = {
         let mut session_msgs = session_messages.lock().await;
         session_msgs.push(user_message.clone());
         session_msgs.clone()
@@ -478,7 +479,7 @@ async fn process_message_streaming(
     let working_dir = Some(std::env::current_dir()?);
     session::persist_messages(
         &session_file,
-        &messages,
+        messages.messages(),
         Some(provider.clone()),
         working_dir.clone(),
     )
@@ -493,7 +494,7 @@ async fn process_message_streaming(
         retry_config: None,
     };
 
-    match agent.reply(&messages, Some(session_config), None).await {
+    match agent.reply(messages.clone(), Some(session_config), None).await {
         Ok(mut stream) => {
             while let Some(result) = stream.next().await {
                 match result {
@@ -511,7 +512,7 @@ async fn process_message_streaming(
                         };
                         session::persist_messages(
                             &session_file,
-                            &current_messages,
+                            current_messages.messages(),
                             None,
                             working_dir.clone(),
                         )
@@ -617,7 +618,7 @@ async fn process_message_streaming(
                                     // For now, auto-summarize in web mode
                                     // TODO: Implement proper UI for context handling
                                     let (summarized_messages, _) =
-                                        agent.summarize_context(&messages).await?;
+                                        agent.summarize_context(messages.messages()).await?;
                                     messages = summarized_messages;
                                 }
                                 _ => {

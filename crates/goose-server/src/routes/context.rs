@@ -6,7 +6,7 @@ use axum::{
     routing::post,
     Json, Router,
 };
-use goose::message::Message;
+use goose::conversation::Conversation;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use utoipa::ToSchema;
@@ -58,17 +58,17 @@ async fn manage_context(
         .await
         .map_err(|_| StatusCode::PRECONDITION_FAILED)?;
 
-    let mut processed_messages: Conversation = vec![];
+    let mut processed_messages = Conversation::new_unvalidated(vec![]);
     let mut token_counts: Vec<usize> = vec![];
 
     if request.manage_action == "truncation" {
         (processed_messages, token_counts) = agent
-            .truncate_context(&request.messages)
+            .truncate_context(request.messages.messages())
             .await
             .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
     } else if request.manage_action == "summarize" {
         (processed_messages, token_counts) = agent
-            .summarize_context(&request.messages)
+            .summarize_context(request.messages.messages())
             .await
             .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
     }
