@@ -3,6 +3,7 @@ use chrono::{DateTime, TimeZone, Utc};
 use futures::stream::{FuturesUnordered, StreamExt};
 use futures::{future, FutureExt};
 use mcp_core::{ToolCall, ToolError};
+use rmcp::service::ClientInitializeError;
 use rmcp::transport::{
     ConfigureCommandExt, SseClientTransport, StreamableHttpClientTransport, TokioChildProcess,
 };
@@ -21,7 +22,7 @@ use tracing::{error, warn};
 
 use super::extension::{ExtensionConfig, ExtensionError, ExtensionInfo, ExtensionResult, ToolInfo};
 use super::tool_execution::ToolCallResult;
-use crate::agents::extension::Envs;
+use crate::agents::extension::{Envs, ProcessExit};
 use crate::config::{Config, ExtensionConfigManager};
 use crate::prompt_template;
 use mcp_client::client::{McpClient, McpClientTrait};
@@ -171,7 +172,7 @@ impl ExtensionManager {
                             error = %e,
                             "Failed to fetch secret from config."
                         );
-                        return Err(ExtensionError::SetupError(format!(
+                        return Err(ExtensionError::ConfigError(format!(
                             "Failed to fetch secret '{}' from config: {}",
                             key, e
                         )));
@@ -184,9 +185,14 @@ impl ExtensionManager {
 
         let client: Box<dyn McpClientTrait> = match &config {
             ExtensionConfig::Sse { uri, timeout, .. } => {
-                let transport = SseClientTransport::start(uri.to_string())
-                    .await
-                    .map_err(|e| ExtensionError::ClientCreationError(e.to_string()))?;
+                let transport = SseClientTransport::start(uri.to_string()).await.map_err(
+                    |transport_error| {
+                        ClientInitializeError::transport::<SseClientTransport<reqwest::Client>>(
+                            transport_error,
+                            "connect",
+                        )
+                    },
+                )?;
                 Box::new(
                     McpClient::connect(
                         transport,
@@ -205,16 +211,7 @@ impl ExtensionManager {
                         timeout.unwrap_or(crate::config::DEFAULT_EXTENSION_TIMEOUT),
                     ),
                 )
-                .await
-                .map_err(|e| match e {
-                    rmcp::service::ClientInitializeError::ConnectionClosed(_) => {
-                        ExtensionError::ClientCreationError(format!(
-                            "Connection closed. Is the server at {} running?",
-                            uri
-                        ))
-                    }
-                    _ => e.into(),
-                })?;
+                .await?;
                 Box::new(client)
             }
             ExtensionConfig::Stdio {
@@ -231,8 +228,7 @@ impl ExtensionManager {
                 });
                 let (transport, mut stderr) = TokioChildProcess::builder(command)
                     .stderr(Stdio::piped())
-                    .spawn()
-                    .map_err(|e| ExtensionError::ClientCreationError(e.to_string()))?;
+                    .spawn()?;
                 let mut stderr = stderr
                     .take()
                     .expect("should have a stderr handle because it was requested");
@@ -254,16 +250,10 @@ impl ExtensionManager {
                 let client = match client_result {
                     Ok(client) => Ok(client),
                     Err(error) => {
-                        let error_task_out = stderr_task
-                            .await
-                            .map_err(|e| ExtensionError::ClientCreationError(e.to_string()))?;
-
-                        Err(match error_task_out {
-                            Ok(stderr_content) => ExtensionError::ClientCreationError(format!(
-                                "Process quit: {}. Stderr: {}",
-                                error, stderr_content
-                            )),
-                            Err(e) => ExtensionError::ClientCreationError(e.to_string()),
+                        let error_task_out = stderr_task.await?;
+                        Err::<McpClient, ExtensionError>(match error_task_out {
+                            Ok(stderr_content) => ProcessExit::new(stderr_content, error).into(),
+                            Err(e) => e.into(),
                         })
                     }
                 }?;
@@ -285,8 +275,7 @@ impl ExtensionManager {
 
                 let transport = TokioChildProcess::new(Command::new(cmd).configure(|command| {
                     command.arg("mcp").arg(name);
-                }))
-                .map_err(|e| ExtensionError::ClientCreationError(e.to_string()))?;
+                }))?;
                 Box::new(
                     McpClient::connect(
                         transport,
@@ -317,8 +306,7 @@ impl ExtensionManager {
 
                     command.arg("python").arg(file_path.to_str().unwrap());
                 });
-                let transport = TokioChildProcess::new(command)
-                    .map_err(|e| ExtensionError::ClientCreationError(e.to_string()))?;
+                let transport = TokioChildProcess::new(command)?;
 
                 let client = Box::new(
                     McpClient::connect(
