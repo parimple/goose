@@ -199,15 +199,23 @@ impl ExtensionManager {
             }
             ExtensionConfig::StreamableHttp { uri, timeout, .. } => {
                 let transport = StreamableHttpClientTransport::from_uri(uri.to_string());
-                Box::new(
-                    McpClient::connect(
-                        transport,
-                        Duration::from_secs(
-                            timeout.unwrap_or(crate::config::DEFAULT_EXTENSION_TIMEOUT),
-                        ),
-                    )
-                    .await?,
+                let client = McpClient::connect(
+                    transport,
+                    Duration::from_secs(
+                        timeout.unwrap_or(crate::config::DEFAULT_EXTENSION_TIMEOUT),
+                    ),
                 )
+                .await
+                .map_err(|e| match e {
+                    rmcp::service::ClientInitializeError::ConnectionClosed(_) => {
+                        ExtensionError::ClientCreationError(format!(
+                            "Connection closed. Is the server at {} running?",
+                            uri
+                        ))
+                    }
+                    _ => e.into(),
+                })?;
+                Box::new(client)
             }
             ExtensionConfig::Stdio {
                 cmd,
