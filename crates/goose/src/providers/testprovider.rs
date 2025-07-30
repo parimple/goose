@@ -9,6 +9,7 @@ use std::sync::{Arc, Mutex};
 
 use super::base::{Provider, ProviderMetadata, ProviderUsage};
 use super::errors::ProviderError;
+use crate::conversation::Conversation;
 use crate::message::Message;
 use crate::model::ModelConfig;
 use rmcp::model::Tool;
@@ -16,7 +17,7 @@ use rmcp::model::Tool;
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct TestInput {
     system: String,
-    messages: Vec<Message>,
+    messages: Conversation,
     tools: Vec<Tool>,
 }
 
@@ -126,7 +127,7 @@ impl Provider for TestProvider {
             let record = TestRecord {
                 input: TestInput {
                     system: system.to_string(),
-                    messages: messages.to_vec(),
+                    messages: Conversation::new_unvalidated(messages.to_vec()),
                     tools: tools.to_vec(),
                 },
                 output: TestOutput {

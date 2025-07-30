@@ -11,6 +11,7 @@ use crate::agents::types::{
     RetryConfig, SuccessCheck, DEFAULT_ON_FAILURE_TIMEOUT_SECONDS, DEFAULT_RETRY_TIMEOUT_SECONDS,
 };
 use crate::config::Config;
+use crate::conversation::Conversation;
 use crate::message::Message;
 use crate::tool_monitor::ToolMonitor;
 
@@ -92,12 +93,11 @@ impl RetryManager {
 
     /// Reset status for retry: clear message history and final output tool state
     async fn reset_status_for_retry(
-        messages: &mut Vec<Message>,
+        messages: &mut Conversation,
         initial_messages: &[Message],
         final_output_tool: &Arc<Mutex<Option<crate::agents::final_output_tool::FinalOutputTool>>>,
     ) {
-        messages.clear();
-        messages.extend_from_slice(initial_messages);
+        *messages = Conversation::new_unvalidated(initial_messages.to_vec());
         info!("Reset message history to initial state for retry");
 
         if let Some(final_output_tool) = final_output_tool.lock().await.as_mut() {
@@ -109,7 +109,7 @@ impl RetryManager {
     /// Handle retry logic for the agent reply loop
     pub async fn handle_retry_logic(
         &self,
-        messages: &mut Vec<Message>,
+        messages: &mut Conversation,
         session: &Option<SessionConfig>,
         initial_messages: &[Message],
         final_output_tool: &Arc<Mutex<Option<crate::agents::final_output_tool::FinalOutputTool>>>,
@@ -135,7 +135,7 @@ impl RetryManager {
                 "Maximum retry attempts ({}) exceeded. Unable to complete the task successfully.",
                 retry_config.max_retries
             ));
-            messages.push(error_msg);
+            messages.push_message(error_msg);
             warn!(
                 "Maximum retry attempts ({}) exceeded",
                 retry_config.max_retries

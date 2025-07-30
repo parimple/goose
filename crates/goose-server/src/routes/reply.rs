@@ -39,7 +39,7 @@ use utoipa::ToSchema;
 
 #[derive(Debug, Deserialize, Serialize)]
 struct ChatRequest {
-    messages: Vec<Message>,
+    messages: Conversation,
     session_id: Option<String>,
     session_working_dir: String,
     scheduled_job_id: Option<String>,

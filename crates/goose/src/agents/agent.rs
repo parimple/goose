@@ -35,7 +35,8 @@ use crate::agents::tool_vectordb::generate_table_id;
 use crate::agents::types::SessionConfig;
 use crate::agents::types::{FrontendTool, ToolResultReceiver};
 use crate::config::{Config, ExtensionConfigManager, PermissionManager};
-use crate::message::{push_message, Message, ToolRequest};
+use crate::conversation::Conversation;
+use crate::message::{Message, ToolRequest};
 use crate::permission::permission_judge::{check_tool_permissions, PermissionCheckResult};
 use crate::permission::PermissionConfirmation;
 use crate::providers::base::Provider;
@@ -63,7 +64,7 @@ const DEFAULT_MAX_TURNS: u32 = 1000;
 
 /// Context needed for the reply function
 pub struct ReplyContext {
-    pub messages: Vec<Message>,
+    pub messages: Conversation,
     pub tools: Vec<Tool>,
     pub toolshim_tools: Vec<Tool>,
     pub system_prompt: String,
@@ -200,7 +201,7 @@ impl Agent {
     /// Handle retry logic for the agent reply loop
     async fn handle_retry_logic(
         &self,
-        messages: &mut Vec<Message>,
+        messages: &mut Conversation,
         session: &Option<SessionConfig>,
         initial_messages: &[Message],
     ) -> Result<bool> {
@@ -219,24 +220,25 @@ impl Agent {
 
     async fn prepare_reply_context(
         &self,
-        unfixed_messages: &[Message],
+        unfixed_conversation: Conversation,
         session: &Option<SessionConfig>,
     ) -> Result<ReplyContext> {
-        let (messages, issues) = ConversationFixer::fix_conversation(Vec::from(unfixed_messages));
+        let unfixed_messages = unfixed_conversation.messages().clone();
+        let (conversation, issues) = ConversationFixer::fix_conversation(unfixed_conversation);
         if !issues.is_empty() {
             tracing::warn!(
                 "Conversation issue fixed: {}",
-                debug_conversation_fix(&messages, unfixed_messages, &issues)
+                debug_conversation_fix(conversation.messages(), &unfixed_messages, &issues)
             );
         }
-        let initial_messages = messages.clone();
+        let initial_messages = conversation.messages().clone();
         let config = Config::global();
 
         let (tools, toolshim_tools, system_prompt) = self.prepare_tools_and_prompt().await?;
         let goose_mode = Self::determine_goose_mode(session.as_ref(), config);
 
         Ok(ReplyContext {
-            messages,
+            messages: conversation,
             tools,
             toolshim_tools,
             system_prompt,
@@ -825,15 +827,15 @@ impl Agent {
         }
     }
 
-    #[instrument(skip(self, unfixed_messages, session), fields(user_message))]
+    #[instrument(skip(self, unfixed_conversation, session), fields(user_message))]
     pub async fn reply(
         &self,
-        unfixed_messages: &[Message],
+        unfixed_conversation: Conversation,
         session: Option<SessionConfig>,
         cancel_token: Option<CancellationToken>,
     ) -> Result<BoxStream<'_, Result<AgentEvent>>> {
         let context = self
-            .prepare_reply_context(unfixed_messages, &session)
+            .prepare_reply_context(unfixed_conversation, &session)
             .await?;
         let ReplyContext {
             mut messages,
@@ -892,7 +894,7 @@ impl Agent {
                 let mut stream = Self::stream_response_from_provider(
                     self.provider().await?,
                     &system_prompt,
-                    &messages,
+                    messages.messages(),
                     &tools,
                     &toolshim_tools,
                 ).await?;
@@ -1058,8 +1060,8 @@ impl Agent {
                                 yield AgentEvent::Message(final_message_tool_resp.clone());
 
                                 added_message = true;
-                                push_message(&mut messages_to_add, response);
-                                push_message(&mut messages_to_add, final_message_tool_resp);
+                                messages_to_add.push(response);
+                                messages_to_add.push(final_message_tool_resp);
                             }
                         }
                         Err(ProviderError::ContextLengthExceeded(_)) => {
@@ -1280,7 +1282,7 @@ impl Agent {
         }
     }
 
-    pub async fn create_recipe(&self, mut messages: Vec<Message>) -> Result<Recipe> {
+    pub async fn create_recipe(&self, mut messages: Conversation) -> Result<Recipe> {
         let extension_manager = self.extension_manager.read().await;
         let extensions_info = extension_manager.get_extensions_info().await;
 
@@ -1309,7 +1311,7 @@ impl Agent {
             .await
             .as_ref()
             .unwrap()
-            .complete(&system_prompt, &messages, &tools)
+            .complete(&system_prompt, messages.messages(), &tools)
             .await?;
 
         let content = result.as_concat_text();

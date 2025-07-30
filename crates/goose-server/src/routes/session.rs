@@ -33,7 +33,7 @@ pub struct SessionHistoryResponse {
     /// Session metadata containing creation time and other details
     metadata: SessionMetadata,
     /// List of messages in the session conversation
-    messages: Vec<Message>,
+    messages: Conversation,
 }
 
 #[derive(Serialize, ToSchema, Debug)]

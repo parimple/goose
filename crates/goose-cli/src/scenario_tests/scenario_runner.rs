@@ -17,7 +17,7 @@ pub const SCENARIO_TESTS_DIR: &str = "src/scenario_tests";
 
 #[derive(Debug, Clone)]
 pub struct ScenarioResult {
-    pub messages: Vec<Message>,
+    pub messages: Conversation,
     pub error: Option<String>,
 }
 

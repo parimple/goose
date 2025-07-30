@@ -15,6 +15,7 @@ use tokio_cron_scheduler::{job::JobId, Job, JobScheduler as TokioJobScheduler};
 use crate::agents::AgentEvent;
 use crate::agents::{Agent, SessionConfig};
 use crate::config::{self, Config};
+use crate::conversation::Conversation;
 use crate::message::Message;
 use crate::providers::base::Provider as GooseProvider; // Alias to avoid conflict in test section
 use crate::providers::create;
@@ -1185,8 +1186,9 @@ async fn run_scheduled_job_internal(
     };
 
     if let Some(prompt_text) = recipe.prompt {
-        let mut all_session_messages: Vec<Message> =
-            vec![Message::user().with_text(prompt_text.clone())];
+        let mut all_session_messages = Conversation::new_unvalidated(
+            vec![Message::user().with_text(prompt_text.clone())],
+        );
 
         let current_dir = match std::env::current_dir() {
             Ok(cd) => cd,
@@ -1208,7 +1210,7 @@ async fn run_scheduled_job_internal(
         };
 
         match agent
-            .reply(&all_session_messages, Some(session_config.clone()), None)
+            .reply(all_session_messages.clone(), Some(session_config.clone()), None)
             .await
         {
             Ok(mut stream) => {
@@ -1249,7 +1251,7 @@ async fn run_scheduled_job_internal(
                         if let Err(e) = crate::session::storage::save_messages_with_metadata(
                             &session_file_path,
                             &updated_metadata,
-                            &all_session_messages,
+                            all_session_messages.messages(),
                         ) {
                             tracing::error!(
                                 "[Job {}] Failed to persist final messages: {}",
@@ -1280,7 +1282,7 @@ async fn run_scheduled_job_internal(
                         if let Err(e_fb) = crate::session::storage::save_messages_with_metadata(
                             &session_file_path,
                             &fallback_metadata,
-                            &all_session_messages,
+                            all_session_messages.messages(),
                         ) {
                             tracing::error!("[Job {}] Failed to persist final messages with fallback metadata: {}", job.id, e_fb);
                         }

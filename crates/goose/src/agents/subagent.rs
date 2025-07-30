@@ -3,6 +3,7 @@ use crate::{
     agents::extension::ExtensionConfig,
     agents::{extension_manager::ExtensionManager, Agent, TaskConfig},
     config::ExtensionConfigManager,
+    conversation::Conversation,
     message::{Message, MessageContent, ToolRequest},
     prompt_template::render_global_file,
     providers::errors::ProviderError,
@@ -40,7 +41,7 @@ pub struct SubAgentProgress {
 /// A specialized agent that can handle specific tasks independently
 pub struct SubAgent {
     pub id: String,
-    pub conversation: Arc<Mutex<Vec<Message>>>,
+    pub conversation: Arc<Mutex<Conversation>>,
     pub status: Arc<RwLock<SubAgentStatus>>,
     pub config: TaskConfig,
     pub turn_count: Arc<Mutex<usize>>,
@@ -79,7 +80,7 @@ impl SubAgent {
 
         let subagent = Arc::new(SubAgent {
             id: task_config.id.clone(),
-            conversation: Arc::new(Mutex::new(Vec::new())),
+            conversation: Arc::new(Mutex::new(Conversation::new_unvalidated(Vec::new()))),
             status: Arc::new(RwLock::new(SubAgentStatus::Ready)),
             config: task_config,
             turn_count: Arc::new(Mutex::new(0)),
@@ -106,7 +107,7 @@ impl SubAgent {
         &self,
         message: String,
         task_config: TaskConfig,
-    ) -> Result<Vec<Message>, anyhow::Error> {
+    ) -> Result<Conversation, anyhow::Error> {
         debug!("Processing message for subagent {}", self.id);
 
         // Get provider from task config
@@ -123,11 +124,14 @@ impl SubAgent {
         let user_message = Message::user().with_text(message.clone());
         {
             let mut conversation = self.conversation.lock().await;
-            conversation.push(user_message.clone());
+            conversation.push_message(user_message.clone());
         }
 
         // Get the current conversation for context
-        let mut messages = self.get_conversation().await;
+        let mut messages = {
+            let conversation = self.conversation.lock().await;
+            conversation.clone()
+        };
 
         // Get tools from the subagent's own extension manager
         let tools: Vec<Tool> = self
@@ -155,7 +159,7 @@ impl SubAgent {
             match Agent::generate_response_from_provider(
                 Arc::clone(provider),
                 &system_prompt,
-                &messages,
+                messages.messages(),
                 &tools,
                 &toolshim_tools,
             )
@@ -178,7 +182,7 @@ impl SubAgent {
                     // If there are no tool requests, we're done
                     if tool_requests.is_empty() || loop_count >= max_turns {
                         self.add_message(response.clone()).await;
-                        messages.push(response.clone());
+                        messages.push_message(response.clone());
 
                         // Set status back to ready
                         self.set_status(SubAgentStatus::Completed("Completed!".to_string()))
@@ -209,7 +213,7 @@ impl SubAgent {
                                     // Create a user message with the tool response
                                     let tool_response_message = Message::user()
                                         .with_tool_response(request.id.clone(), Ok(result.clone()));
-                                    messages.push(tool_response_message);
+                                    messages.push_message(tool_response_message);
                                 }
                                 Err(e) => {
                                     // Create a user message with the tool error
@@ -217,7 +221,7 @@ impl SubAgent {
                                         request.id.clone(),
                                         Err(ToolError::ExecutionError(e.to_string())),
                                     );
-                                    messages.push(tool_error_message);
+                                    messages.push_message(tool_error_message);
                                 }
                             }
                         }
@@ -249,6 +253,12 @@ impl SubAgent {
             }
         }
 
+        // Update the conversation with the final messages
+        {
+            let mut conversation = self.conversation.lock().await;
+            *conversation = messages.clone();
+        }
+
         // Handle error cases or return the last message
         if let Some(error) = last_error {
             Err(error)
@@ -260,11 +270,11 @@ impl SubAgent {
     /// Add a message to the conversation (for tracking agent responses)
     async fn add_message(&self, message: Message) {
         let mut conversation = self.conversation.lock().await;
-        conversation.push(message);
+        conversation.push_message(message);
     }
 
     /// Get the full conversation history
-    async fn get_conversation(&self) -> Vec<Message> {
+    async fn get_conversation(&self) -> Conversation {
         self.conversation.lock().await.clone()
     }
 

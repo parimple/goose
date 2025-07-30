@@ -1,4 +1,7 @@
-use crate::message::{Message, MessageContent};
+use crate::{
+    conversation::Conversation,
+    message::{Message, MessageContent},
+};
 use rmcp::model::Role;
 use std::collections::HashSet;
 
@@ -9,7 +12,8 @@ const PLACEHOLDER_USER_MESSAGE: &str = "Hello";
 impl ConversationFixer {
     /// Fix a conversation that we're about to send to an LLM. So the last and first
     /// messages should always be from the user.
-    pub fn fix_conversation(messages: Vec<Message>) -> (Vec<Message>, Vec<String>) {
+    pub fn fix_conversation(conversation: Conversation) -> (Conversation, Vec<String>) {
+        let messages = conversation.messages().clone();
         let (messages, empty_removed) = Self::remove_empty_messages(messages);
         let (messages, tool_calling_fixed) = Self::fix_tool_calling(messages);
         let (messages, messages_merged) = Self::merge_consecutive_messages(messages);
@@ -23,7 +27,7 @@ impl ConversationFixer {
         issues.extend(lead_trail_fixed);
         issues.extend(populated_if_empty);
 
-        (messages, issues)
+        (Conversation::new_unvalidated(messages), issues)
     }
 
     fn remove_empty_messages(messages: Vec<Message>) -> (Vec<Message>, Vec<String>) {

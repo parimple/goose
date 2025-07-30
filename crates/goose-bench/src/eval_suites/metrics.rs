@@ -8,7 +8,7 @@ use std::time::Instant;
 pub async fn collect_baseline_metrics(
     agent: &mut BenchAgent,
     prompt: String,
-) -> (Vec<Message>, HashMap<String, EvalMetricValue>) {
+) -> (Conversation, HashMap<String, EvalMetricValue>) {
     // Initialize metrics map
     let mut metrics = HashMap::new();
 

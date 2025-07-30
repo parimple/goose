@@ -56,7 +56,7 @@ pub enum RunMode {
 
 pub struct Session {
     agent: Agent,
-    messages: Vec<Message>,
+    messages: Conversation,
     session_file: Option<PathBuf>,
     // Cache for completion data - using std::sync for thread safety without async
     completion_cache: Arc<std::sync::RwLock<CompletionCache>>,
@@ -157,7 +157,7 @@ impl Session {
 
     /// Helper function to summarize context messages
     async fn summarize_context_messages(
-        messages: &mut Vec<Message>,
+        messages: &mut Conversation,
         agent: &Agent,
         message_suffix: &str,
     ) -> Result<()> {
@@ -764,7 +764,7 @@ impl Session {
 
     async fn plan_with_reasoner_model(
         &mut self,
-        plan_messages: Vec<Message>,
+        plan_messages: Conversation,
         reasoner: Arc<dyn Provider>,
     ) -> Result<(), anyhow::Error> {
         let plan_prompt = self.agent.get_plan_prompt().await?;
@@ -1344,7 +1344,7 @@ impl Session {
         cache.last_updated = Instant::now();
     }
 
-    pub fn message_history(&self) -> Vec<Message> {
+    pub fn message_history(&self) -> Conversation {
         self.messages.clone()
     }
 

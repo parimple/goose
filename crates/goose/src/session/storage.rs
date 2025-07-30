@@ -5,6 +5,7 @@
 // - Backup creation
 // Additional debug logging can be added if needed for troubleshooting.
 
+use crate::conversation::Conversation;
 use crate::message::Message;
 use crate::providers::base::Provider;
 use crate::utils::safe_truncate;
@@ -399,7 +400,7 @@ pub fn generate_session_id() -> String {
 /// Security features:
 /// - Validates file paths to prevent directory traversal
 /// - Includes all security limits from read_messages_with_truncation
-pub fn read_messages(session_file: &Path) -> Result<Vec<Message>> {
+pub fn read_messages(session_file: &Path) -> Result<Conversation> {
     // Validate the path for security
     let secure_path = get_path(Identifier::Path(session_file.to_path_buf()))?;
 
@@ -428,7 +429,7 @@ pub fn read_messages(session_file: &Path) -> Result<Vec<Message>> {
 pub fn read_messages_with_truncation(
     session_file: &Path,
     max_content_size: Option<usize>,
-) -> Result<Vec<Message>> {
+) -> Result<Conversation> {
     // Security check: file size limit
     if session_file.exists() {
         let metadata = fs::metadata(session_file)?;
@@ -626,7 +627,7 @@ pub fn read_messages_with_truncation(
         }
     }
 
-    Ok(messages)
+    Ok(Conversation::new_unvalidated(messages))
 }
 
 /// Parse a message from JSON string with optional content truncation
@@ -1340,7 +1341,7 @@ pub async fn update_metadata(session_file: &Path, metadata: &SessionMetadata) ->
     let messages = read_messages(&secure_path)?;
 
     // Rewrite the file with the new metadata and existing messages
-    save_messages_with_metadata(&secure_path, metadata, &messages)
+    save_messages_with_metadata(&secure_path, metadata, messages.messages())
 }
 
 #[cfg(test)]

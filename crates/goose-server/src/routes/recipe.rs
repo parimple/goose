@@ -11,7 +11,7 @@ use crate::state::AppState;
 
 #[derive(Debug, Deserialize, ToSchema)]
 pub struct CreateRecipeRequest {
-    messages: Vec<Message>,
+    messages: Conversation,
     // Required metadata
     title: String,
     description: String,

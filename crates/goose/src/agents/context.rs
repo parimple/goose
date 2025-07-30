@@ -1,5 +1,6 @@
 use anyhow::Ok;
 
+use crate::conversation::Conversation;
 use crate::message::Message;
 use crate::token_counter::create_async_token_counter;
 
@@ -14,7 +15,7 @@ impl Agent {
     pub async fn truncate_context(
         &self,
         messages: &[Message], // last message is a user msg that led to assistant message with_context_length_exceeded
-    ) -> Result<(Vec<Message>, Vec<usize>), anyhow::Error> {
+    ) -> Result<(Conversation, Vec<usize>), anyhow::Error> {
         let provider = self.provider().await?;
         let token_counter = create_async_token_counter()
             .await
@@ -51,7 +52,7 @@ impl Agent {
     pub async fn summarize_context(
         &self,
         messages: &[Message], // last message is a user msg that led to assistant message with_context_length_exceeded
-    ) -> Result<(Vec<Message>, Vec<usize>), anyhow::Error> {
+    ) -> Result<(Conversation, Vec<usize>), anyhow::Error> {
         let provider = self.provider().await?;
         let token_counter = create_async_token_counter()
             .await

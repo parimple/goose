@@ -16,7 +16,7 @@ use utoipa::ToSchema;
 #[serde(rename_all = "camelCase")]
 pub struct ContextManageRequest {
     /// Collection of messages to be managed
-    pub messages: Vec<Message>,
+    pub messages: Conversation,
     /// Operation to perform: "truncation" or "summarize"
     pub manage_action: String,
 }
@@ -26,7 +26,7 @@ pub struct ContextManageRequest {
 #[serde(rename_all = "camelCase")]
 pub struct ContextManageResponse {
     /// Processed messages after the operation
-    pub messages: Vec<Message>,
+    pub messages: Conversation,
     /// Token counts for each processed message
     pub token_counts: Vec<usize>,
 }
@@ -58,7 +58,7 @@ async fn manage_context(
         .await
         .map_err(|_| StatusCode::PRECONDITION_FAILED)?;
 
-    let mut processed_messages: Vec<Message> = vec![];
+    let mut processed_messages: Conversation = vec![];
     let mut token_counts: Vec<usize> = vec![];
 
     if request.manage_action == "truncation" {

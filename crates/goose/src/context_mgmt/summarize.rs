@@ -1,4 +1,5 @@
 use super::common::{get_messages_token_counts, get_messages_token_counts_async};
+use crate::conversation::Conversation;
 use crate::message::{Message, MessageContent};
 use crate::providers::base::Provider;
 use crate::token_counter::{AsyncTokenCounter, TokenCounter};
@@ -16,13 +17,15 @@ async fn summarize_combined_messages(
     provider: &Arc<dyn Provider>,
     accumulated_summary: &[Message],
     current_chunk: &[Message],
-) -> Result<Vec<Message>, anyhow::Error> {
+) -> Result<Conversation, anyhow::Error> {
     // Combine the accumulated summary and current chunk into a single batch.
-    let combined_messages: Vec<Message> = accumulated_summary
-        .iter()
-        .cloned()
-        .chain(current_chunk.iter().cloned())
-        .collect();
+    let combined_messages = Conversation::new_unvalidated(
+        accumulated_summary
+            .iter()
+            .cloned()
+            .chain(current_chunk.iter().cloned())
+            .collect::<Vec<_>>()
+    );
 
     // Format the batch as a summarization request.
     let request_text = format!(
@@ -40,7 +43,7 @@ async fn summarize_combined_messages(
     response.role = Role::User;
 
     // Return the summary as the new accumulated summary.
-    Ok(vec![response])
+    Ok(Conversation::new_unvalidated(vec![response]))
 }
 
 /// Preprocesses the messages to handle edge cases involving tool responses.
@@ -52,7 +55,7 @@ async fn summarize_combined_messages(
 ///    - The corresponding tool request message that immediately precedes the last tool response message (if present).
 ///
 /// The function only considers the last tool response message and its pair for removal.
-fn preprocess_messages(messages: &[Message]) -> (Vec<Message>, Vec<Message>) {
+fn preprocess_messages(messages: &[Message]) -> (Conversation, Conversation) {
     let mut preprocessed_messages = messages.to_owned();
     let mut removed_messages = Vec::new();
 
@@ -84,7 +87,7 @@ fn preprocess_messages(messages: &[Message]) -> (Vec<Message>, Vec<Message>) {
         preprocessed_messages.drain(start_index..=last_index);
     }
 
-    (preprocessed_messages, removed_messages)
+    (Conversation::new_unvalidated(preprocessed_messages), Conversation::new_unvalidated(removed_messages))
 }
 
 /// Reinserts removed messages into the summarized output.
@@ -95,10 +98,10 @@ fn preprocess_messages(messages: &[Message]) -> (Vec<Message>, Vec<Message>) {
 fn reintegrate_removed_messages(
     summarized_messages: &[Message],
     removed_messages: &[Message],
-) -> Vec<Message> {
+) -> Conversation {
     let mut final_messages = summarized_messages.to_owned();
     final_messages.extend_from_slice(removed_messages);
-    final_messages
+    Conversation::new_unvalidated(final_messages)
 }
 
 // Summarization steps:
@@ -112,7 +115,7 @@ pub async fn summarize_messages(
     messages: &[Message],
     token_counter: &TokenCounter,
     context_limit: usize,
-) -> Result<(Vec<Message>, Vec<usize>), anyhow::Error> {
+) -> Result<(Conversation, Vec<usize>), anyhow::Error> {
     let chunk_size = context_limit / 3; // 33% of the context window.
     let summary_prompt_tokens = token_counter.count_tokens(SUMMARY_PROMPT);
     let mut accumulated_summary = Vec::new();
@@ -121,18 +124,18 @@ pub async fn summarize_messages(
     let (preprocessed_messages, removed_messages) = preprocess_messages(messages);
 
     // Get token counts for each message.
-    let token_counts = get_messages_token_counts(token_counter, &preprocessed_messages);
+    let token_counts = get_messages_token_counts(token_counter, preprocessed_messages.messages());
 
     // Tokenize and break messages into chunks.
-    let mut current_chunk: Vec<Message> = Vec::new();
+    let mut current_chunk = Vec::new();
     let mut current_chunk_tokens = 0;
 
     for (message, message_tokens) in preprocessed_messages.iter().zip(token_counts.iter()) {
         if current_chunk_tokens + message_tokens > chunk_size - summary_prompt_tokens {
             // Summarize the current chunk with the accumulated summary.
-            accumulated_summary =
-                summarize_combined_messages(&provider, &accumulated_summary, &current_chunk)
+            let summary_response = summarize_combined_messages(&provider, &accumulated_summary, &current_chunk)
                     .await?;
+            accumulated_summary = summary_response.messages().clone();
 
             // Reset for the next chunk.
             current_chunk.clear();
@@ -146,16 +149,16 @@ pub async fn summarize_messages(
 
     // Summarize the final chunk if it exists.
     if !current_chunk.is_empty() {
-        accumulated_summary =
-            summarize_combined_messages(&provider, &accumulated_summary, &current_chunk).await?;
+        let summary_response = summarize_combined_messages(&provider, &accumulated_summary, &current_chunk).await?;
+        accumulated_summary = summary_response.messages().clone();
     }
 
     // Add back removed messages.
-    let final_summary = reintegrate_removed_messages(&accumulated_summary, &removed_messages);
+    let final_summary = reintegrate_removed_messages(&accumulated_summary, removed_messages.messages());
 
     Ok((
         final_summary.clone(),
-        get_messages_token_counts(token_counter, &final_summary),
+        get_messages_token_counts(token_counter, final_summary.messages())
     ))
 }
 
@@ -165,7 +168,7 @@ pub async fn summarize_messages_async(
     messages: &[Message],
     token_counter: &AsyncTokenCounter,
     context_limit: usize,
-) -> Result<(Vec<Message>, Vec<usize>), anyhow::Error> {
+) -> Result<(Conversation, Vec<usize>), anyhow::Error> {
     let chunk_size = context_limit / 3; // 33% of the context window.
     let summary_prompt_tokens = token_counter.count_tokens(SUMMARY_PROMPT);
     let mut accumulated_summary = Vec::new();
@@ -174,18 +177,18 @@ pub async fn summarize_messages_async(
     let (preprocessed_messages, removed_messages) = preprocess_messages(messages);
 
     // Get token counts for each message.
-    let token_counts = get_messages_token_counts_async(token_counter, &preprocessed_messages);
+    let token_counts = get_messages_token_counts_async(token_counter, preprocessed_messages.messages());
 
     // Tokenize and break messages into chunks.
-    let mut current_chunk: Vec<Message> = Vec::new();
+    let mut current_chunk = Vec::new();
     let mut current_chunk_tokens = 0;
 
     for (message, message_tokens) in preprocessed_messages.iter().zip(token_counts.iter()) {
         if current_chunk_tokens + message_tokens > chunk_size - summary_prompt_tokens {
             // Summarize the current chunk with the accumulated summary.
-            accumulated_summary =
-                summarize_combined_messages(&provider, &accumulated_summary, &current_chunk)
+            let summary_response = summarize_combined_messages(&provider, &accumulated_summary, &current_chunk)
                     .await?;
+            accumulated_summary = summary_response.messages().clone();
 
             // Reset for the next chunk.
             current_chunk.clear();
@@ -199,16 +202,16 @@ pub async fn summarize_messages_async(
 
     // Summarize the final chunk if it exists.
     if !current_chunk.is_empty() {
-        accumulated_summary =
-            summarize_combined_messages(&provider, &accumulated_summary, &current_chunk).await?;
+        let summary_response = summarize_combined_messages(&provider, &accumulated_summary, &current_chunk).await?;
+        accumulated_summary = summary_response.messages().clone();
     }
 
     // Add back removed messages.
-    let final_summary = reintegrate_removed_messages(&accumulated_summary, &removed_messages);
+    let final_summary = reintegrate_removed_messages(&accumulated_summary, removed_messages.messages());
 
     Ok((
         final_summary.clone(),
-        get_messages_token_counts_async(token_counter, &final_summary),
+        get_messages_token_counts_async(token_counter, final_summary.messages()),
     ))
 }
 
@@ -272,7 +275,7 @@ mod tests {
         })
     }
 
-    fn create_test_messages() -> Vec<Message> {
+    fn create_test_messages() -> Conversation {
         vec![
             set_up_text_message("Message 1", Role::User),
             set_up_text_message("Message 2", Role::Assistant),
@@ -380,7 +383,7 @@ mod tests {
         let provider = create_mock_provider();
         let token_counter = TokenCounter::new();
         let context_limit = 100;
-        let messages: Vec<Message> = Vec::new();
+        let messages: Conversation = Vec::new();
 
         let result = summarize_messages(
             Arc::clone(&provider),

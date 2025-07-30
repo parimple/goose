@@ -1,3 +1,4 @@
+use crate::conversation::Conversation;
 use crate::message::{Message, MessageContent};
 use crate::utils::safe_truncate;
 use anyhow::{anyhow, Result};
@@ -16,7 +17,7 @@ fn handle_oversized_messages(
     token_counts: &[usize],
     context_limit: usize,
     strategy: &dyn TruncationStrategy,
-) -> Result<(Vec<Message>, Vec<usize>), anyhow::Error> {
+) -> Result<(Conversation, Vec<usize>), anyhow::Error> {
     let mut truncated_messages = Vec::new();
     let mut truncated_token_counts = Vec::new();
     let mut any_truncated = false;
@@ -67,7 +68,7 @@ fn handle_oversized_messages(
         );
     }
 
-    Ok((truncated_messages, truncated_token_counts))
+    Ok((Conversation::new_unvalidated(truncated_messages), truncated_token_counts))
 }
 
 /// Truncates the content within a message while preserving its structure
@@ -180,7 +181,7 @@ pub fn truncate_messages(
     token_counts: &[usize],
     context_limit: usize,
     strategy: &dyn TruncationStrategy,
-) -> Result<(Vec<Message>, Vec<usize>), anyhow::Error> {
+) -> Result<(Conversation, Vec<usize>), anyhow::Error> {
     let mut messages = messages.to_owned();
     let mut token_counts = token_counts.to_owned();
 
@@ -221,7 +222,7 @@ pub fn truncate_messages(
     }
 
     if total_tokens <= context_limit {
-        return Ok((messages, token_counts)); // No truncation needed
+        return Ok((Conversation::new_unvalidated(messages.to_vec()), token_counts.to_vec())); // No truncation needed
     }
 
     // Step 2: Determine indices to remove based on strategy
@@ -303,7 +304,7 @@ pub fn truncate_messages(
     }
 
     debug!("Truncation complete. Total tokens: {}", total_tokens);
-    Ok((messages, token_counts))
+    Ok((Conversation::new_unvalidated(messages.to_vec()), token_counts.to_vec()))
 }
 
 /// Trait representing a truncation strategy
@@ -423,8 +424,8 @@ mod tests {
         num_pairs: usize,
         tokens: usize,
         remove_last: bool,
-    ) -> (Vec<Message>, Vec<usize>) {
-        let mut messages: Vec<Message> = (0..num_pairs)
+    ) -> (Conversation, Vec<usize>) {
+        let mut messages: Conversation = (0..num_pairs)
             .flat_map(|i| {
                 vec![
                     user_text(i * 2, tokens).0,
