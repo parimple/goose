@@ -1,5 +1,5 @@
-use thiserror::Error;
 use serde::{Deserialize, Serialize};
+use thiserror::Error;
 
 use crate::message::{Message, MessageContent};
 use std::result::Result;
@@ -31,6 +31,10 @@ impl Conversation {
         Self {
             messages: messages.into_iter().collect(),
         }
+    }
+
+    pub fn empty() -> Self {
+        Self::new_unvalidated([])
     }
 
     pub fn messages(&self) -> &Vec<Message> {

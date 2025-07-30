@@ -5,6 +5,7 @@ use std::sync::Arc;
 use anyhow::Result;
 use futures::StreamExt;
 use goose::agents::{Agent, AgentEvent};
+use goose::conversation::Conversation;
 use goose::message::Message;
 use goose::model::ModelConfig;
 use goose::providers::base::Provider;
@@ -117,7 +118,7 @@ async fn run_truncate_test(
     agent.update_provider(provider).await?;
     let repeat_count = context_window + 10_000;
     let large_message_content = "hello ".repeat(repeat_count);
-    let messages = vec![
+    let messages = Conversation::new(vec![
         Message::user().with_text("hi there. what is 2 + 2?"),
         Message::assistant().with_text("hey! I think it's 4."),
         Message::user().with_text(&large_message_content),
@@ -127,9 +128,10 @@ async fn run_truncate_test(
         Message::user().with_text(
             "did I ask you what's 2+2 in this message history? just respond with 'yes' or 'no'",
         ),
-    ];
+    ])
+    .unwrap();
 
-    let reply_stream = agent.reply(&messages, None, None).await?;
+    let reply_stream = agent.reply(messages, None, None).await?;
     tokio::pin!(reply_stream);
 
     let mut responses = Vec::new();
@@ -543,6 +545,7 @@ mod final_output_tool_tests {
     use goose::agents::final_output_tool::{
         FINAL_OUTPUT_CONTINUATION_MESSAGE, FINAL_OUTPUT_TOOL_NAME,
     };
+    use goose::conversation::Conversation;
     use goose::providers::base::MessageStream;
     use goose::recipe::Response;
 
@@ -623,7 +626,7 @@ mod final_output_tool_tests {
         );
 
         // Simulate the reply stream continuing after the final output tool call.
-        let reply_stream = agent.reply(&vec![], None, None).await?;
+        let reply_stream = agent.reply(Conversation::empty(), None, None).await?;
         tokio::pin!(reply_stream);
 
         let mut responses = Vec::new();
@@ -720,7 +723,7 @@ mod final_output_tool_tests {
         agent.add_final_output_tool(response).await;
 
         // Simulate the reply stream being called.
-        let reply_stream = agent.reply(&vec![], None, None).await?;
+        let reply_stream = agent.reply(Conversation::empty(), None, None).await?;
         tokio::pin!(reply_stream);
 
         let mut responses = Vec::new();
@@ -770,6 +773,7 @@ mod retry_tests {
     use super::*;
     use async_trait::async_trait;
     use goose::agents::types::{RetryConfig, SessionConfig, SuccessCheck};
+    use goose::conversation::Conversation;
     use goose::model::ModelConfig;
     use goose::providers::base::{Provider, ProviderUsage, Usage};
     use goose::providers::errors::ProviderError;
@@ -852,10 +856,11 @@ mod retry_tests {
             retry_config: Some(retry_config),
         };
 
-        let initial_messages = vec![Message::user().with_text("Complete this task")];
+        let conversation =
+            Conversation::new(vec![Message::user().with_text("Complete this task")]).unwrap();
 
         let reply_stream = agent
-            .reply(&initial_messages, Some(session_config), None)
+            .reply(conversation, Some(session_config), None)
             .await?;
         tokio::pin!(reply_stream);
 
@@ -949,6 +954,7 @@ mod retry_tests {
 mod max_turns_tests {
     use super::*;
     use async_trait::async_trait;
+    use goose::conversation::Conversation;
     use goose::message::MessageContent;
     use goose::model::ModelConfig;
     use goose::providers::base::{Provider, ProviderMetadata, ProviderUsage, Usage};
@@ -1018,9 +1024,11 @@ mod max_turns_tests {
             max_turns: Some(1),
             retry_config: None,
         };
-        let messages = vec![Message::user().with_text("Hello")];
+        let conversation = Conversation::new(vec![Message::user().with_text("Hello")]).unwrap();
 
-        let reply_stream = agent.reply(&messages, Some(session_config), None).await?;
+        let reply_stream = agent
+            .reply(conversation, Some(session_config), None)
+            .await?;
         tokio::pin!(reply_stream);
 
         let mut responses = Vec::new();

@@ -235,7 +235,8 @@ mod tests {
     use serde_json::json;
 
     fn run_verify(messages: Vec<Message>) -> (Vec<Message>, Vec<String>) {
-        let (fixed, issues) = ConversationFixer::fix_conversation(messages.clone());
+        let (fixed, issues) =
+            ConversationFixer::fix_conversation(Conversation::new_unvalidated(messages.clone()));
 
         // Uncomment the following line to print the debug report
         // let report = debug_conversation_fix(&messages, &fixed, &issues);
@@ -247,9 +248,9 @@ mod tests {
             0,
             "Fixed conversation should have no issues, but found: {:?}\n\n{}",
             issues_with_fixed,
-            debug_conversation_fix(&messages, &fixed, &issues)
+            debug_conversation_fix(&messages, &fixed.messages(), &issues)
         );
-        (fixed, issues)
+        (fixed.messages().clone(), issues)
     }
 
     #[test]
@@ -270,7 +271,7 @@ mod tests {
         ];
 
         for i in 1..=all_messages.len() {
-            let messages = all_messages[..i].to_vec();
+            let messages = Conversation::new_unvalidated(all_messages[..i].to_vec());
             if messages.last().unwrap().role == Role::User {
                 let (fixed, issues) = ConversationFixer::fix_conversation(messages.clone());
                 assert_eq!(
@@ -285,7 +286,12 @@ mod tests {
                     i,
                     issues
                 );
-                assert_eq!(fixed, messages, "Step {}: Messages should be unchanged", i);
+                assert_eq!(
+                    fixed.messages(),
+                    messages.messages(),
+                    "Step {}: Messages should be unchanged",
+                    i
+                );
             }
         }
     }
@@ -357,7 +363,7 @@ mod tests {
 
     #[test]
     fn test_real_world_consecutive_assistant_messages() {
-        let messages = vec![
+        let conversation = Conversation::new_unvalidated(vec![
             Message::user().with_text("run ls in the current directory and then run a word count on the smallest file"),
             Message::assistant()
                 .with_text("I'll help you run `ls` in the current directory and then perform a word count on the smallest file. Let me start by listing the directory contents.")
@@ -370,9 +376,9 @@ mod tests {
             Message::assistant()
                 .with_text("I ran `ls -la` in the current directory and found several files. Looking at the file sizes, I can see that both `slack.yaml` and `subrecipes.yaml` are 0 bytes (the smallest files). I ran a word count on `slack.yaml` which shows: **0 lines**, **0 words**, **0 characters**"),
             Message::user().with_text("thanks!"),
-        ];
+        ]);
 
-        let (fixed, issues) = ConversationFixer::fix_conversation(messages);
+        let (fixed, issues) = ConversationFixer::fix_conversation(conversation);
 
         assert_eq!(fixed.len(), 5);
         assert_eq!(issues.len(), 2);

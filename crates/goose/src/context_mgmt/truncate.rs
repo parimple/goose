@@ -68,7 +68,10 @@ fn handle_oversized_messages(
         );
     }
 
-    Ok((Conversation::new_unvalidated(truncated_messages), truncated_token_counts))
+    Ok((
+        Conversation::new_unvalidated(truncated_messages),
+        truncated_token_counts,
+    ))
 }
 
 /// Truncates the content within a message while preserving its structure
@@ -222,7 +225,10 @@ pub fn truncate_messages(
     }
 
     if total_tokens <= context_limit {
-        return Ok((Conversation::new_unvalidated(messages.to_vec()), token_counts.to_vec())); // No truncation needed
+        return Ok((
+            Conversation::new_unvalidated(messages.to_vec()),
+            token_counts.to_vec(),
+        )); // No truncation needed
     }
 
     // Step 2: Determine indices to remove based on strategy
@@ -304,7 +310,10 @@ pub fn truncate_messages(
     }
 
     debug!("Truncation complete. Total tokens: {}", total_tokens);
-    Ok((Conversation::new_unvalidated(messages.to_vec()), token_counts.to_vec()))
+    Ok((
+        Conversation::new_unvalidated(messages.to_vec()),
+        token_counts.to_vec(),
+    ))
 }
 
 /// Trait representing a truncation strategy
@@ -425,14 +434,13 @@ mod tests {
         tokens: usize,
         remove_last: bool,
     ) -> (Conversation, Vec<usize>) {
-        let mut messages: Conversation = (0..num_pairs)
-            .flat_map(|i| {
-                vec![
-                    user_text(i * 2, tokens).0,
-                    assistant_text((i * 2) + 1, tokens).0,
-                ]
-            })
-            .collect();
+        let mut messages = Conversation::new((0..num_pairs).flat_map(|i| {
+            vec![
+                user_text(i * 2, tokens).0,
+                assistant_text((i * 2) + 1, tokens).0,
+            ]
+        }))
+        .unwrap();
 
         if remove_last {
             messages.pop();
@@ -499,13 +507,13 @@ mod tests {
         let context_limit = 25;
 
         let result = truncate_messages(
-            &messages,
+            &messages.messages(),
             &token_counts,
             context_limit,
             &OldestFirstTruncation,
         )?;
 
-        assert_eq!(result.0, messages);
+        assert_eq!(result.0.messages(), messages.messages());
         assert_eq!(result.1, token_counts);
         Ok(())
     }
@@ -583,7 +591,7 @@ mod tests {
         let context_limit = 100; // Exactly matches total tokens
 
         let result = truncate_messages(
-            &messages,
+            &messages.messages(),
             &token_counts,
             context_limit,
             &OldestFirstTruncation,
@@ -598,7 +606,7 @@ mod tests {
         token_counts.push(1);
 
         let result = truncate_messages(
-            &messages,
+            &messages.messages(),
             &token_counts,
             context_limit,
             &OldestFirstTruncation,
@@ -703,7 +711,7 @@ mod tests {
         // Test impossibly small context window
         let (messages, token_counts) = create_messages_with_counts(1, 10, false);
         let result = truncate_messages(
-            &messages,
+            &messages.messages(),
             &token_counts,
             5, // Impossibly small context
             &OldestFirstTruncation,

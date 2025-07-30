@@ -273,11 +273,6 @@ impl SubAgent {
         conversation.push_message(message);
     }
 
-    /// Get the full conversation history
-    async fn get_conversation(&self) -> Conversation {
-        self.conversation.lock().await.clone()
-    }
-
     /// Build the system prompt for the subagent using the template
     async fn build_system_prompt(&self, available_tools: &[Tool]) -> Result<String, anyhow::Error> {
         let mut context = HashMap::new();

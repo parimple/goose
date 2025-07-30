@@ -161,7 +161,11 @@ async fn reply_handler(
         };
 
         let mut stream = match agent
-            .reply(messages.clone(), Some(session_config), Some(task_cancel.clone()))
+            .reply(
+                messages.clone(),
+                Some(session_config),
+                Some(task_cancel.clone()),
+            )
             .await
         {
             Ok(stream) => stream,
@@ -459,7 +463,10 @@ mod tests {
                 .header("x-secret-key", "test-secret")
                 .body(Body::from(
                     serde_json::to_string(&ChatRequest {
-                        messages: vec![Message::user().with_text("test message")],
+                        messages: Conversation::new(
+                            vec![Message::user().with_text("test message")],
+                        )
+                        .unwrap(),
                         session_id: Some("test-session".to_string()),
                         session_working_dir: "test-working-dir".to_string(),
                         scheduled_job_id: None,

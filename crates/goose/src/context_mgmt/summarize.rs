@@ -1,8 +1,8 @@
-use super::common::{get_messages_token_counts, get_messages_token_counts_async};
+use super::common::get_messages_token_counts_async;
 use crate::conversation::Conversation;
 use crate::message::{Message, MessageContent};
 use crate::providers::base::Provider;
-use crate::token_counter::{AsyncTokenCounter, TokenCounter};
+use crate::token_counter::AsyncTokenCounter;
 use anyhow::Result;
 use rmcp::model::Role;
 use std::sync::Arc;
@@ -24,7 +24,7 @@ async fn summarize_combined_messages(
             .iter()
             .cloned()
             .chain(current_chunk.iter().cloned())
-            .collect::<Vec<_>>()
+            .collect::<Vec<_>>(),
     );
 
     // Format the batch as a summarization request.
@@ -55,7 +55,7 @@ async fn summarize_combined_messages(
 ///    - The corresponding tool request message that immediately precedes the last tool response message (if present).
 ///
 /// The function only considers the last tool response message and its pair for removal.
-fn preprocess_messages(messages: &[Message]) -> (Conversation, Conversation) {
+fn preprocess_messages(messages: &[Message]) -> (Vec<Message>, Vec<Message>) {
     let mut preprocessed_messages = messages.to_owned();
     let mut removed_messages = Vec::new();
 
@@ -87,7 +87,7 @@ fn preprocess_messages(messages: &[Message]) -> (Conversation, Conversation) {
         preprocessed_messages.drain(start_index..=last_index);
     }
 
-    (Conversation::new_unvalidated(preprocessed_messages), Conversation::new_unvalidated(removed_messages))
+    (preprocessed_messages, removed_messages)
 }
 
 /// Reinserts removed messages into the summarized output.
@@ -102,64 +102,6 @@ fn reintegrate_removed_messages(
     let mut final_messages = summarized_messages.to_owned();
     final_messages.extend_from_slice(removed_messages);
     Conversation::new_unvalidated(final_messages)
-}
-
-// Summarization steps:
-// 1. Break down large text into smaller chunks (roughly 30% of the model’s context window).
-// 2. For each chunk:
-//    a. Combine it with the previous summary (or leave blank for the first iteration).
-//    b. Summarize the combined text, focusing on extracting only the information we need.
-// 3. Generate a final summary using a tailored prompt.
-pub async fn summarize_messages(
-    provider: Arc<dyn Provider>,
-    messages: &[Message],
-    token_counter: &TokenCounter,
-    context_limit: usize,
-) -> Result<(Conversation, Vec<usize>), anyhow::Error> {
-    let chunk_size = context_limit / 3; // 33% of the context window.
-    let summary_prompt_tokens = token_counter.count_tokens(SUMMARY_PROMPT);
-    let mut accumulated_summary = Vec::new();
-
-    // Preprocess messages to handle tool response edge case.
-    let (preprocessed_messages, removed_messages) = preprocess_messages(messages);
-
-    // Get token counts for each message.
-    let token_counts = get_messages_token_counts(token_counter, preprocessed_messages.messages());
-
-    // Tokenize and break messages into chunks.
-    let mut current_chunk = Vec::new();
-    let mut current_chunk_tokens = 0;
-
-    for (message, message_tokens) in preprocessed_messages.iter().zip(token_counts.iter()) {
-        if current_chunk_tokens + message_tokens > chunk_size - summary_prompt_tokens {
-            // Summarize the current chunk with the accumulated summary.
-            let summary_response = summarize_combined_messages(&provider, &accumulated_summary, &current_chunk)
-                    .await?;
-            accumulated_summary = summary_response.messages().clone();
-
-            // Reset for the next chunk.
-            current_chunk.clear();
-            current_chunk_tokens = 0;
-        }
-
-        // Add message to the current chunk.
-        current_chunk.push(message.clone());
-        current_chunk_tokens += message_tokens;
-    }
-
-    // Summarize the final chunk if it exists.
-    if !current_chunk.is_empty() {
-        let summary_response = summarize_combined_messages(&provider, &accumulated_summary, &current_chunk).await?;
-        accumulated_summary = summary_response.messages().clone();
-    }
-
-    // Add back removed messages.
-    let final_summary = reintegrate_removed_messages(&accumulated_summary, removed_messages.messages());
-
-    Ok((
-        final_summary.clone(),
-        get_messages_token_counts(token_counter, final_summary.messages())
-    ))
 }
 
 /// Async version using AsyncTokenCounter for better performance
@@ -177,7 +119,8 @@ pub async fn summarize_messages_async(
     let (preprocessed_messages, removed_messages) = preprocess_messages(messages);
 
     // Get token counts for each message.
-    let token_counts = get_messages_token_counts_async(token_counter, preprocessed_messages.messages());
+    let token_counts =
+        get_messages_token_counts_async(token_counter, preprocessed_messages.as_slice());
 
     // Tokenize and break messages into chunks.
     let mut current_chunk = Vec::new();
@@ -186,7 +129,8 @@ pub async fn summarize_messages_async(
     for (message, message_tokens) in preprocessed_messages.iter().zip(token_counts.iter()) {
         if current_chunk_tokens + message_tokens > chunk_size - summary_prompt_tokens {
             // Summarize the current chunk with the accumulated summary.
-            let summary_response = summarize_combined_messages(&provider, &accumulated_summary, &current_chunk)
+            let summary_response =
+                summarize_combined_messages(&provider, &accumulated_summary, &current_chunk)
                     .await?;
             accumulated_summary = summary_response.messages().clone();
 
@@ -202,12 +146,14 @@ pub async fn summarize_messages_async(
 
     // Summarize the final chunk if it exists.
     if !current_chunk.is_empty() {
-        let summary_response = summarize_combined_messages(&provider, &accumulated_summary, &current_chunk).await?;
+        let summary_response =
+            summarize_combined_messages(&provider, &accumulated_summary, &current_chunk).await?;
         accumulated_summary = summary_response.messages().clone();
     }
 
     // Add back removed messages.
-    let final_summary = reintegrate_removed_messages(&accumulated_summary, removed_messages.messages());
+    let final_summary =
+        reintegrate_removed_messages(&accumulated_summary, removed_messages.as_slice());
 
     Ok((
         final_summary.clone(),
@@ -219,68 +165,19 @@ pub async fn summarize_messages_async(
 mod tests {
     use super::*;
     use crate::message::{Message, MessageContent};
-    use crate::model::ModelConfig;
-    use crate::providers::base::{Provider, ProviderMetadata, ProviderUsage, Usage};
-    use crate::providers::errors::ProviderError;
     use chrono::Utc;
     use mcp_core::ToolCall;
     use rmcp::model::Role;
-    use rmcp::model::Tool;
     use rmcp::model::{AnnotateAble, Content, RawTextContent};
     use serde_json::json;
-    use std::sync::Arc;
-
-    #[derive(Clone)]
-    struct MockProvider {
-        model_config: ModelConfig,
-    }
-
-    #[async_trait::async_trait]
-    impl Provider for MockProvider {
-        fn metadata() -> ProviderMetadata {
-            ProviderMetadata::empty()
-        }
-
-        fn get_model_config(&self) -> ModelConfig {
-            self.model_config.clone()
-        }
-
-        async fn complete(
-            &self,
-            _system: &str,
-            _messages: &[Message],
-            _tools: &[Tool],
-        ) -> Result<(Message, ProviderUsage), ProviderError> {
-            Ok((
-                Message::new(
-                    Role::Assistant,
-                    Utc::now().timestamp(),
-                    vec![MessageContent::Text(
-                        RawTextContent {
-                            text: "Summarized content".to_string(),
-                        }
-                        .no_annotation(),
-                    )],
-                ),
-                ProviderUsage::new("mock".to_string(), Usage::default()),
-            ))
-        }
-    }
-
-    fn create_mock_provider() -> Arc<dyn Provider> {
-        let mock_model_config =
-            ModelConfig::new("test-model".to_string()).with_context_limit(200_000.into());
-        Arc::new(MockProvider {
-            model_config: mock_model_config,
-        })
-    }
 
     fn create_test_messages() -> Conversation {
-        vec![
+        Conversation::new(vec![
             set_up_text_message("Message 1", Role::User),
             set_up_text_message("Message 2", Role::Assistant),
             set_up_text_message("Message 3", Role::User),
-        ]
+        ])
+        .unwrap()
     }
 
     fn set_up_text_message(text: &str, role: Role) -> Message {
@@ -307,110 +204,9 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_summarize_messages_single_chunk() {
-        let provider = create_mock_provider();
-        let token_counter = TokenCounter::new();
-        let context_limit = 100; // Set a high enough limit to avoid chunking.
-        let messages = create_test_messages();
-
-        let result = summarize_messages(
-            Arc::clone(&provider),
-            &messages,
-            &token_counter,
-            context_limit,
-        )
-        .await;
-
-        assert!(result.is_ok(), "The function should return Ok.");
-        let (summarized_messages, token_counts) = result.unwrap();
-
-        assert_eq!(
-            summarized_messages.len(),
-            1,
-            "The summary should contain one message."
-        );
-        assert_eq!(
-            summarized_messages[0].role,
-            Role::User,
-            "The summarized message should be from the user."
-        );
-
-        assert_eq!(
-            token_counts.len(),
-            1,
-            "Token counts should match the number of summarized messages."
-        );
-    }
-
-    #[tokio::test]
-    async fn test_summarize_messages_multiple_chunks() {
-        let provider = create_mock_provider();
-        let token_counter = TokenCounter::new();
-        let context_limit = 30;
-        let messages = create_test_messages();
-
-        let result = summarize_messages(
-            Arc::clone(&provider),
-            &messages,
-            &token_counter,
-            context_limit,
-        )
-        .await;
-
-        assert!(result.is_ok(), "The function should return Ok.");
-        let (summarized_messages, token_counts) = result.unwrap();
-
-        assert_eq!(
-            summarized_messages.len(),
-            1,
-            "There should be one final summarized message."
-        );
-        assert_eq!(
-            summarized_messages[0].role,
-            Role::User,
-            "The summarized message should be from the user."
-        );
-
-        assert_eq!(
-            token_counts.len(),
-            1,
-            "Token counts should match the number of summarized messages."
-        );
-    }
-
-    #[tokio::test]
-    async fn test_summarize_messages_empty_input() {
-        let provider = create_mock_provider();
-        let token_counter = TokenCounter::new();
-        let context_limit = 100;
-        let messages: Conversation = Vec::new();
-
-        let result = summarize_messages(
-            Arc::clone(&provider),
-            &messages,
-            &token_counter,
-            context_limit,
-        )
-        .await;
-
-        assert!(result.is_ok(), "The function should return Ok.");
-        let (summarized_messages, token_counts) = result.unwrap();
-
-        assert_eq!(
-            summarized_messages.len(),
-            0,
-            "The summary should be empty for an empty input."
-        );
-        assert!(
-            token_counts.is_empty(),
-            "Token counts should be empty for an empty input."
-        );
-    }
-
-    #[tokio::test]
     async fn test_preprocess_messages_without_tool_response() {
         let messages = create_test_messages();
-        let (preprocessed_messages, removed_messages) = preprocess_messages(&messages);
+        let (preprocessed_messages, removed_messages) = preprocess_messages(&messages.messages());
 
         assert_eq!(
             preprocessed_messages.len(),

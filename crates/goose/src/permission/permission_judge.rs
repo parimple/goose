@@ -261,8 +261,7 @@ pub async fn check_tool_permissions(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::conversation::Conversation;
-use crate::message::{Message, MessageContent, ToolRequest};
+    use crate::message::{Message, MessageContent, ToolRequest};
     use crate::model::ModelConfig;
     use crate::providers::base::{Provider, ProviderMetadata, ProviderUsage, Usage};
     use crate::providers::errors::ProviderError;
@@ -342,7 +341,7 @@ use crate::message::{Message, MessageContent, ToolRequest};
 
         let messages = create_check_messages(vec![&tool_request]);
         assert_eq!(messages.len(), 1);
-        let content = &messages[0].content[0];
+        let content = &messages.first().unwrap().content[0];
         if let MessageContent::Text(text_content) = content {
             assert!(text_content
                 .text

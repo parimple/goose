@@ -1616,7 +1616,9 @@ mod tests {
         assert_eq!(messages.len(), read_messages.len());
 
         // First message should be truncated
-        if let Some(MessageContent::Text(read_text)) = read_messages[0].content.first() {
+        if let Some(MessageContent::Text(read_text)) =
+            read_messages.first().unwrap().content.first()
+        {
             assert!(
                 read_text.text.len() < very_large_text.len(),
                 "Content should be truncated"
@@ -1636,7 +1638,7 @@ mod tests {
         }
 
         // Second message should be unchanged
-        if let Some(MessageContent::Text(read_text)) = read_messages[1].content.first() {
+        if let Some(MessageContent::Text(read_text)) = read_messages.messages()[1].content.first() {
             assert_eq!(read_text.text, "Small response");
         } else {
             panic!("Expected text content in second message");
@@ -1729,7 +1731,7 @@ mod tests {
         // Verify the messages are also preserved
         let read_messages = read_messages(&file_path)?;
         assert_eq!(read_messages.len(), 1);
-        assert_eq!(read_messages[0].role, messages[0].role);
+        assert_eq!(read_messages.first().unwrap().role, messages[0].role);
 
         Ok(())
     }
