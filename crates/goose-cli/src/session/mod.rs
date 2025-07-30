@@ -712,8 +712,10 @@ impl Session {
                         let provider = self.agent.provider().await?;
 
                         // Call the summarize_context method which uses the summarize_messages function
-                        let (summarized_messages, _) =
-                            self.agent.summarize_context(self.messages.messages()).await?;
+                        let (summarized_messages, _) = self
+                            .agent
+                            .summarize_context(self.messages.messages())
+                            .await?;
 
                         // Update the session messages with the summarized ones
                         self.messages = summarized_messages;
@@ -769,7 +771,9 @@ impl Session {
     ) -> Result<(), anyhow::Error> {
         let plan_prompt = self.agent.get_plan_prompt().await?;
         output::show_thinking();
-        let (plan_response, _usage) = reasoner.complete(&plan_prompt, plan_messages.messages(), &[]).await?;
+        let (plan_response, _usage) = reasoner
+            .complete(&plan_prompt, plan_messages.messages(), &[])
+            .await?;
         output::render_message(&plan_response, self.debug);
         output::hide_thinking();
         let planner_response_type =
@@ -862,7 +866,11 @@ impl Session {
         });
         let mut stream = self
             .agent
-            .reply(self.messages.clone(), session_config.clone(), Some(cancel_token))
+            .reply(
+                self.messages.clone(),
+                session_config.clone(),
+                Some(cancel_token),
+            )
             .await?;
 
         let mut progress_bars = output::McpSpinners::new();

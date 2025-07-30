@@ -1186,9 +1186,8 @@ async fn run_scheduled_job_internal(
     };
 
     if let Some(prompt_text) = recipe.prompt {
-        let mut all_session_messages = Conversation::new_unvalidated(
-            vec![Message::user().with_text(prompt_text.clone())],
-        );
+        let mut all_session_messages =
+            Conversation::new_unvalidated(vec![Message::user().with_text(prompt_text.clone())]);
 
         let current_dir = match std::env::current_dir() {
             Ok(cd) => cd,
@@ -1210,7 +1209,11 @@ async fn run_scheduled_job_internal(
         };
 
         match agent
-            .reply(all_session_messages.clone(), Some(session_config.clone()), None)
+            .reply(
+                all_session_messages.clone(),
+                Some(session_config.clone()),
+                None,
+            )
             .await
         {
             Ok(mut stream) => {

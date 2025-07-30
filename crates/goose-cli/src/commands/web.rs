@@ -321,7 +321,9 @@ async fn handle_socket(socket: WebSocket, state: AppState) {
 
                                     // Load existing messages from JSONL file if it exists
                                     let existing_messages = session::read_messages(&session_file)
-                                        .unwrap_or_else(|_| Conversation::new_unvalidated(Vec::new()));
+                                        .unwrap_or_else(|_| {
+                                            Conversation::new_unvalidated(Vec::new())
+                                        });
 
                                     let new_session = Arc::new(Mutex::new(existing_messages));
                                     sessions.insert(session_id.clone(), new_session.clone());
@@ -494,7 +496,10 @@ async fn process_message_streaming(
         retry_config: None,
     };
 
-    match agent.reply(messages.clone(), Some(session_config), None).await {
+    match agent
+        .reply(messages.clone(), Some(session_config), None)
+        .await
+    {
         Ok(mut stream) => {
             while let Some(result) = stream.next().await {
                 match result {

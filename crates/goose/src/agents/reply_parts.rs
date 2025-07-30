@@ -178,11 +178,19 @@ impl Agent {
 
         let mut stream = if provider.supports_streaming() {
             provider
-                .stream(system_prompt.as_str(), messages_for_provider.messages(), &tools)
+                .stream(
+                    system_prompt.as_str(),
+                    messages_for_provider.messages(),
+                    &tools,
+                )
                 .await?
         } else {
             let (message, usage) = provider
-                .complete(system_prompt.as_str(), messages_for_provider.messages(), &tools)
+                .complete(
+                    system_prompt.as_str(),
+                    messages_for_provider.messages(),
+                    &tools,
+                )
                 .await?;
             stream_from_single_message(message, usage)
         };

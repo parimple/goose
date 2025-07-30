@@ -195,7 +195,8 @@ pub fn handle_session_export(identifier: Identifier, output_path: Option<PathBuf
     };
 
     // Generate the markdown content using the export functionality
-    let markdown = export_session_to_markdown(messages.messages().clone(), &session_file_path, None);
+    let markdown =
+        export_session_to_markdown(messages.messages().clone(), &session_file_path, None);
 
     // Output the markdown
     if let Some(output) = output_path {
