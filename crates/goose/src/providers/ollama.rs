@@ -160,10 +160,11 @@ impl Provider for OllamaProvider {
     /// Generate a session name based on the conversation history
     /// This override filters out reasoning tokens that some Ollama models produce
     async fn generate_session_name(&self, messages: &[Message]) -> Result<String, ProviderError> {
-        let message = Message::user().with_text(&self.create_session_name_prompt(messages));
+        let context = self.get_initial_user_messages(messages);
+        let message = Message::user().with_text(self.create_session_name_prompt(&context));
         let result = self
             .complete(
-                "You are a title generator. Output only the requested title with no additional text, reasoning, or explanations.",
+                "You are a title generator. Output only the requested title of 4 words or less, with no additional text, reasoning, or explanations.",
                 &[message],
                 &[],
             )
@@ -172,18 +173,7 @@ impl Provider for OllamaProvider {
         let mut description = result.0.as_concat_text();
         description = Self::filter_reasoning_tokens(&description);
 
-        let sanitized_description = if description.chars().count() > 100 {
-            safe_truncate(&description, 100)
-        } else {
-            description
-        };
-
-        // If the description is too long, the model failed to give us a short description, provide a fallback instead
-        if sanitized_description.split_whitespace().count() > 6 {
-            Ok("Ollama Chat Session".to_string())
-        } else {
-            Ok(sanitized_description)
-        }
+        Ok(safe_truncate(&description, 100))
     }
 }
 
