@@ -124,7 +124,7 @@ impl SubAgent {
         let user_message = Message::user().with_text(message.clone());
         {
             let mut conversation = self.conversation.lock().await;
-            conversation.push_message(user_message.clone());
+            conversation.push(user_message.clone());
         }
 
         // Get the current conversation for context
@@ -182,7 +182,7 @@ impl SubAgent {
                     // If there are no tool requests, we're done
                     if tool_requests.is_empty() || loop_count >= max_turns {
                         self.add_message(response.clone()).await;
-                        messages.push_message(response.clone());
+                        messages.push(response.clone());
 
                         // Set status back to ready
                         self.set_status(SubAgentStatus::Completed("Completed!".to_string()))
@@ -213,7 +213,7 @@ impl SubAgent {
                                     // Create a user message with the tool response
                                     let tool_response_message = Message::user()
                                         .with_tool_response(request.id.clone(), Ok(result.clone()));
-                                    messages.push_message(tool_response_message);
+                                    messages.push(tool_response_message);
                                 }
                                 Err(e) => {
                                     // Create a user message with the tool error
@@ -221,7 +221,7 @@ impl SubAgent {
                                         request.id.clone(),
                                         Err(ToolError::ExecutionError(e.to_string())),
                                     );
-                                    messages.push_message(tool_error_message);
+                                    messages.push(tool_error_message);
                                 }
                             }
                         }
@@ -270,7 +270,7 @@ impl SubAgent {
     /// Add a message to the conversation (for tracking agent responses)
     async fn add_message(&self, message: Message) {
         let mut conversation = self.conversation.lock().await;
-        conversation.push_message(message);
+        conversation.push(message);
     }
 
     /// Build the system prompt for the subagent using the template

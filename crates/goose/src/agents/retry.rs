@@ -135,7 +135,7 @@ impl RetryManager {
                 "Maximum retry attempts ({}) exceeded. Unable to complete the task successfully.",
                 retry_config.max_retries
             ));
-            messages.push_message(error_msg);
+            messages.push(error_msg);
             warn!(
                 "Maximum retry attempts ({}) exceeded",
                 retry_config.max_retries

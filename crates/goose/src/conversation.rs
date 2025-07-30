@@ -41,7 +41,7 @@ impl Conversation {
         &self.messages
     }
 
-    pub fn push_message(&mut self, message: Message) {
+    pub fn push(&mut self, message: Message) {
         if let Some(last) = self
             .messages
             .last_mut()
@@ -78,16 +78,12 @@ impl Conversation {
         self.messages.is_empty()
     }
 
-    pub fn push(&mut self, message: Message) {
-        self.push_message(message);
-    }
-
     pub fn extend<I>(&mut self, iter: I)
     where
         I: IntoIterator<Item = Message>,
     {
         for message in iter {
-            self.push_message(message);
+            self.push(message);
         }
     }
 
