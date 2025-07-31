@@ -1,9 +1,11 @@
 use anyhow::Result;
+use axum::http::{HeaderMap, HeaderName};
 use chrono::{DateTime, TimeZone, Utc};
 use futures::stream::{FuturesUnordered, StreamExt};
 use futures::{future, FutureExt};
 use mcp_core::{ToolCall, ToolError};
 use rmcp::service::ClientInitializeError;
+use rmcp::transport::streamable_http_client::StreamableHttpClientTransportConfig;
 use rmcp::transport::{
     ConfigureCommandExt, SseClientTransport, StreamableHttpClientTransport, TokioChildProcess,
 };
@@ -203,8 +205,36 @@ impl ExtensionManager {
                     .await?,
                 )
             }
-            ExtensionConfig::StreamableHttp { uri, timeout, .. } => {
-                let transport = StreamableHttpClientTransport::from_uri(uri.to_string());
+            ExtensionConfig::StreamableHttp {
+                uri,
+                timeout,
+                headers,
+                ..
+            } => {
+                let mut default_headers = HeaderMap::new();
+                for (key, value) in headers {
+                    default_headers.insert(
+                        HeaderName::try_from(key).map_err(|_| {
+                            ExtensionError::ConfigError(format!("invalid header: {}", key))
+                        })?,
+                        value.parse().map_err(|_| {
+                            ExtensionError::ConfigError(format!("invalid header value: {}", key))
+                        })?,
+                    );
+                }
+                let client = reqwest::Client::builder()
+                    .default_headers(default_headers)
+                    .build()
+                    .map_err(|_| {
+                        ExtensionError::ConfigError("could not construct http client".to_string())
+                    })?;
+                let transport = StreamableHttpClientTransport::with_client(
+                    client,
+                    StreamableHttpClientTransportConfig {
+                        uri: uri.clone().into(),
+                        ..Default::default()
+                    },
+                );
                 let client = McpClient::connect(
                     transport,
                     Duration::from_secs(
