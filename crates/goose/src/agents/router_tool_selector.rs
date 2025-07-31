@@ -80,7 +80,7 @@ impl RouterToolSelector for VectorToolSelector {
                             code: ErrorCode::INVALID_PARAMS,
                             message: Cow::from("Missing 'query' parameter"),
                             data: None,
-        }))?;
+                        })?;
 
         let k = params.get("k").and_then(|v| v.as_u64()).unwrap_or(5) as usize;
 
@@ -93,8 +93,7 @@ impl RouterToolSelector for VectorToolSelector {
                             code: ErrorCode::INTERNAL_ERROR,
                             message: Cow::from("Embedding provider does not support embeddings"),
                             data: None,
-        },
-            ));
+                        });
         }
 
         let embeddings = self
@@ -103,10 +102,10 @@ impl RouterToolSelector for VectorToolSelector {
             .await
             .map_err(|e| {
                 ErrorData {
-                            code: ErrorCode::INTERNAL_ERROR,
-                            message: Cow::from(format!("Failed to generate query embedding: {}", e)),
-                            data: None,
-        })
+                    code: ErrorCode::INTERNAL_ERROR,
+                    message: Cow::from(format!("Failed to generate query embedding: {}", e)),
+                    data: None,
+                }
             })?;
 
         let query_embedding = embeddings
@@ -116,17 +115,17 @@ impl RouterToolSelector for VectorToolSelector {
                             code: ErrorCode::INTERNAL_ERROR,
                             message: Cow::from("No embedding returned"),
                             data: None,
-        }))?;
+            })?;
 
         let vector_db = self.vector_db.read().await;
         let tools = vector_db
             .search_tools(query_embedding, k, extension_name)
             .await
             .map_err(|e| ErrorData {
-                            code: ErrorCode::INTERNAL_ERROR,
-                            message: Cow::from(format!("Failed to search tools: {}", e)),
-                            data: None,
-        }))?;
+                code: ErrorCode::INTERNAL_ERROR,
+                message: Cow::from(format!("Failed to search tools: {}", e)),
+                data: None,
+            })?;
 
         let selected_tools: Vec<Content> = tools
             .into_iter()
@@ -162,11 +161,10 @@ impl RouterToolSelector for VectorToolSelector {
 
         if !self.embedding_provider.supports_embeddings() {
             return Err(ErrorData {
-                            code: ErrorCode::INTERNAL_ERROR,
-                            message: Cow::from("Embedding provider does not support embeddings"),
-                            data: None,
-        },
-            ));
+                code: ErrorCode::INTERNAL_ERROR,
+                message: Cow::from("Embedding provider does not support embeddings"),
+                data: None,
+            });
         }
 
         let embeddings = self
@@ -175,10 +173,10 @@ impl RouterToolSelector for VectorToolSelector {
             .await
             .map_err(|e| {
                 ErrorData {
-                            code: ErrorCode::INTERNAL_ERROR,
-                            message: Cow::from(format!("Failed to generate tool embeddings: {}", e)),
-                            data: None,
-        })
+                    code: ErrorCode::INTERNAL_ERROR,
+                    message: Cow::from(format!("Failed to generate tool embeddings: {}", e)),
+                    data: None,
+                }
             })?;
 
         // Create tool records
@@ -217,7 +215,7 @@ impl RouterToolSelector for VectorToolSelector {
                             code: ErrorCode::INTERNAL_ERROR,
                             message: Cow::from(format!("Failed to search for existing tools: {}", e)),
                             data: None,
-        })
+                    }
                 })?;
 
             // Only add if no exact match found
@@ -235,10 +233,10 @@ impl RouterToolSelector for VectorToolSelector {
                 .index_tools(new_tool_records)
                 .await
                 .map_err(|e| ErrorData {
-                            code: ErrorCode::INTERNAL_ERROR,
-                            message: Cow::from(format!("Failed to index tools: {}", e)),
-                            data: None,
-        }))?;
+                    code: ErrorCode::INTERNAL_ERROR,
+                    message: Cow::from(format!("Failed to index tools: {}", e)),
+                    data: None,
+                })?;
         }
 
         Ok(())
@@ -248,10 +246,10 @@ impl RouterToolSelector for VectorToolSelector {
         let vector_db = self.vector_db.read().await;
         vector_db.remove_tool(tool_name).await.map_err(|e| {
             ErrorData {
-                            code: ErrorCode::INTERNAL_ERROR,
-                            message: Cow::from(format!("Failed to remove tool {}: {}", tool_name, e)),
-                            data: None,
-        })
+                code: ErrorCode::INTERNAL_ERROR,
+                message: Cow::from(format!("Failed to remove tool {}: {}", tool_name, e)),
+                data: None,
+            }
         })?;
         Ok(())
     }
@@ -301,7 +299,7 @@ impl RouterToolSelector for LLMToolSelector {
                             code: ErrorCode::INVALID_PARAMS,
                             message: Cow::from("Missing 'query' parameter"),
                             data: None,
-        }))?;
+            })?;
 
         let extension_name = params
             .get("extension_name")
@@ -338,7 +336,7 @@ impl RouterToolSelector for LLMToolSelector {
                             code: ErrorCode::INTERNAL_ERROR,
                             message: Cow::from(format!("Failed to search tools: {}", e)),
                             data: None,
-        }))?;
+                })?;
 
             // Extract just the message content from the response
             let (message, _usage) = response;
