@@ -534,9 +534,9 @@ impl ExtensionManager {
             .and_then(|v| v.as_str())
             .ok_or_else(|| ErrorData {
             code: ErrorCode::INVALID_PARAMS,
-            message: Cow::from("Missing 'uri' parameter".to_string(),
+            message: Cow::from("Missing 'uri' parameter".to_string()),
             data: None,
-        }))?;
+        })?;
 
         let extension_name = params.get("extension_name").and_then(|v| v.as_str());
 
@@ -599,18 +599,18 @@ impl ExtensionManager {
             .clients
             .get(extension_name)
             .ok_or(ErrorData {
-            code: ErrorCode::INVALID_PARAMS,
-            message: Cow::from(error_msg),
-            data: None,
+                code: ErrorCode::INVALID_PARAMS,
+                message: Cow::from(error_msg),
+                data: None,
         })?;
 
         let client_guard = client.lock().await;
         let read_result = client_guard.read_resource(uri).await.map_err(|_| {
             ErrorData {
-            code: ErrorCode::INTERNAL_ERROR,
-            message: Cow::from(format!("Could not read resource with uri: {}", uri),
-            data: None,
-        })
+                code: ErrorCode::INTERNAL_ERROR,
+                message: Cow::from(format!("Could not read resource with uri: {}", uri)),
+                data: None,
+            }
         })?;
 
         let mut result = Vec::new();
@@ -631,10 +631,10 @@ impl ExtensionManager {
     ) -> Result<Vec<Content>, ErrorData> {
         let client = self.clients.get(extension_name).ok_or_else(|| {
             ErrorData {
-            code: ErrorCode::INVALID_PARAMS,
-            message: Cow::from(format!("Extension {} is not valid", extension_name),
-            data: None,
-        })
+                code: ErrorCode::INVALID_PARAMS,
+                message: Cow::from(format!("Extension {} is not valid", extension_name)),
+                data: None,
+            }
         })?;
 
         let client_guard = client.lock().await;
@@ -643,12 +643,10 @@ impl ExtensionManager {
             .await
             .map_err(|e| {
                 ErrorData {
-            code: ErrorCode::INTERNAL_ERROR,
-            message: Cow::from(format!(
-                    "Unable to list resources for {}, {:?}",
-                    extension_name, e),
-            data: None,
-        })
+                    code: ErrorCode::INTERNAL_ERROR,
+                    message: Cow::from(format!("Unable to list resources for {}, {:?}", extension_name, e)),
+                    data: None,
+                }
             })
             .map(|lr| {
                 let resource_list = lr
@@ -717,10 +715,10 @@ impl ExtensionManager {
         let (client_name, client) = self
             .get_client_for_tool(&tool_call.name)
             .ok_or_else(|| ErrorData {
-            code: ErrorCode::INVALID_REQUEST,
-            message: Cow::from(tool_call.name.clone(),
-            data: None,
-        }))?;
+                code: ErrorCode::INVALID_REQUEST,
+                message: Cow::from(tool_call.name.clone()),
+                data: None,
+            })?;
 
         // rsplit returns the iterator in reverse, tool_name is then at 0
         let tool_name = tool_call
@@ -728,10 +726,10 @@ impl ExtensionManager {
             .strip_prefix(client_name)
             .and_then(|s| s.strip_prefix("__"))
             .ok_or_else(|| ErrorData {
-            code: ErrorCode::INVALID_REQUEST,
-            message: Cow::from(tool_call.name.clone(),
-            data: None,
-        }))?
+                code: ErrorCode::INVALID_REQUEST,
+                message: Cow::from(tool_call.name.clone()),
+                data: None,
+            })?
             .to_string();
 
         let arguments = tool_call.arguments.clone();
@@ -745,10 +743,10 @@ impl ExtensionManager {
                 .await
                 .map(|call| call.content)
                 .map_err(|e| ErrorData {
-            code: ErrorCode::INTERNAL_ERROR,
-            message: Cow::from(e.to_string(),
-            data: None,
-        }))
+                    code: ErrorCode::INTERNAL_ERROR,
+                    message: Cow::from(e.to_string()),
+                    data: None,
+                })
         };
 
         Ok(ToolCallResult {
@@ -763,10 +761,10 @@ impl ExtensionManager {
     ) -> Result<Vec<Prompt>, ErrorData> {
         let client = self.clients.get(extension_name).ok_or_else(|| {
             ErrorData {
-            code: ErrorCode::INVALID_PARAMS,
-            message: Cow::from(format!("Extension {} is not valid", extension_name),
-            data: None,
-        })
+                code: ErrorCode::INVALID_PARAMS,
+                message: Cow::from(format!("Extension {} is not valid", extension_name)),
+                data: None,
+            }
         })?;
 
         let client_guard = client.lock().await;
@@ -775,12 +773,10 @@ impl ExtensionManager {
             .await
             .map_err(|e| {
                 ErrorData {
-            code: ErrorCode::INTERNAL_ERROR,
-            message: Cow::from(format!(
-                    "Unable to list prompts for {}, {:?}",
-                    extension_name, e),
-            data: None,
-        })
+                    code: ErrorCode::INTERNAL_ERROR,
+                    message: Cow::from(format!("Unable to list prompts for {}, {:?}", extension_name, e)),
+                    data: None,
+                }
             })
             .map(|lp| lp.prompts)
     }
