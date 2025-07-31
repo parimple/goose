@@ -20,7 +20,6 @@ impl MorphLLMEditor {
         }
     }
 
-    /// Parse update_snippet for code and instruction tags and format the prompt accordingly
     fn format_user_prompt(original_code: &str, update_snippet: &str) -> String {
         if let (Some(code_start), Some(code_end)) = (
             update_snippet.find("<code>"),
@@ -29,8 +28,8 @@ impl MorphLLMEditor {
             // Check if we have valid code tags
             if code_start < code_end {
                 let code_content = &update_snippet[code_start + 6..code_end].trim();
-                
-                // Look for instruction tags
+
+                // Look for instruction tags which help provide hints
                 if let (Some(inst_start), Some(inst_end)) = (
                     update_snippet.find("<instruction>"),
                     update_snippet.find("</instruction>"),
@@ -50,8 +49,7 @@ impl MorphLLMEditor {
                     original_code, code_content
                 );
             }
-        }
-        // No code tags found or invalid tags, use original behavior
+        }        
         format!(
             "<code>{}</code>\n<update>{}</update>",
             original_code, update_snippet
@@ -235,7 +233,8 @@ mod tests {
     #[test]
     fn test_format_user_prompt_invalid_instruction_tags() {
         let original_code = "fn main() {}";
-        let update_snippet = "<code>fn main() { println!(\"Hello\"); }</code></instruction>Invalid<instruction>";
+        let update_snippet =
+            "<code>fn main() { println!(\"Hello\"); }</code></instruction>Invalid<instruction>";
         let result = MorphLLMEditor::format_user_prompt(original_code, update_snippet);
         assert_eq!(
             result,
