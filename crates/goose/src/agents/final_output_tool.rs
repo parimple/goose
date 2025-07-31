@@ -1,3 +1,4 @@
+use std::borrow::Cow;
 use crate::agents::tool_execution::ToolCallResult;
 use crate::recipe::Response;
 use indoc::formatdoc;
@@ -128,20 +129,17 @@ impl FinalOutputTool {
                         )]))
                     }
                     Err(error) => ToolCallResult::from(Err(ErrorData {
-                code: ErrorCode::INVALID_PARAMS,
-                message: Cow::from(error),
-                data: None,
-            })),
+                        code: ErrorCode::INVALID_PARAMS,
+                        message: Cow::from(error),
+                        data: None,
+                    })),
                 }
             }
             _ => ToolCallResult::from(Err(ErrorData {
                 code: ErrorCode::INVALID_REQUEST,
-                message: Cow::from(format!(
-                "Unknown tool: {}",
-                tool_call.name
-            ),
-                data: None,
-            }))),
+                message: Cow::from(format!("Unknown tool: {}", tool_call.name)),
+                data: None
+            })),
         }
     }
 
