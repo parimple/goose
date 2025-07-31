@@ -840,27 +840,27 @@ impl DeveloperRouter {
         ])
     }
 
-    async fn text_editor(&self, params: Value) -> Result<Vec<Content>, ToolError> {
+    async fn text_editor(&self, params: Value) -> Result<Vec<Content>, ErrorData> {
         let command = params
             .get("command")
             .and_then(|v| v.as_str())
             .ok_or_else(|| {
-                ToolError::InvalidParameters("Missing 'command' parameter".to_string())
+                ErrorData::new(ErrorCode::INVALID_PARAMS, "Missing 'command' parameter".to_string(), None)
             })?;
 
         let path_str = params
             .get("path")
             .and_then(|v| v.as_str())
-            .ok_or_else(|| ToolError::InvalidParameters("Missing 'path' parameter".into()))?;
+            .ok_or_else(|| ErrorData::new(ErrorCode::INVALID_PARAMS, "Missing 'path' parameter".into(), None))?;
 
         let path = self.resolve_path(path_str)?;
 
         // Check if file is ignored before proceeding with any text editor operation
         if self.is_ignored(&path) {
-            return Err(ToolError::ExecutionError(format!(
+            return Err(ErrorData::new(ErrorCode::INTERNAL_ERROR, format!(
                 "Access to '{}' is restricted by .gooseignore",
                 path.display()
-            )));
+            ), None));
         }
 
         match command {
@@ -884,7 +884,7 @@ impl DeveloperRouter {
                     .get("file_text")
                     .and_then(|v| v.as_str())
                     .ok_or_else(|| {
-                        ToolError::InvalidParameters("Missing 'file_text' parameter".into())
+                        ErrorData::new(ErrorCode::INVALID_PARAMS, "Missing 'file_text' parameter".into(), None)
                     })?;
 
                 self.text_editor_write(&path, file_text).await
@@ -894,13 +894,13 @@ impl DeveloperRouter {
                     .get("old_str")
                     .and_then(|v| v.as_str())
                     .ok_or_else(|| {
-                        ToolError::InvalidParameters("Missing 'old_str' parameter".into())
+                        ErrorData::new(ErrorCode::INVALID_PARAMS, "Missing 'old_str' parameter".into(), None)
                     })?;
                 let new_str = params
                     .get("new_str")
                     .and_then(|v| v.as_str())
                     .ok_or_else(|| {
-                        ToolError::InvalidParameters("Missing 'new_str' parameter".into())
+                        ErrorData::new(ErrorCode::INVALID_PARAMS, "Missing 'new_str' parameter".into(), None)
                     })?;
 
                 self.text_editor_replace(&path, old_str, new_str).await
@@ -910,22 +910,22 @@ impl DeveloperRouter {
                     .get("insert_line")
                     .and_then(|v| v.as_i64())
                     .ok_or_else(|| {
-                        ToolError::InvalidParameters("Missing 'insert_line' parameter".into())
+                        ErrorData::new(ErrorCode::INVALID_PARAMS, "Missing 'insert_line' parameter".into(), None)
                     })? as usize;
                 let new_str = params
                     .get("new_str")
                     .and_then(|v| v.as_str())
                     .ok_or_else(|| {
-                        ToolError::InvalidParameters("Missing 'new_str' parameter".into())
+                        ErrorData::new(ErrorCode::INVALID_PARAMS, "Missing 'new_str' parameter".into(), None)
                     })?;
 
                 self.text_editor_insert(&path, insert_line, new_str).await
             }
             "undo_edit" => self.text_editor_undo(&path).await,
-            _ => Err(ToolError::InvalidParameters(format!(
+            _ => Err(ErrorData::new(ErrorCode::INVALID_PARAMS, format!(
                 "Unknown command '{}'",
                 command
-            ))),
+            ), None))
         }
     }
 
@@ -933,7 +933,7 @@ impl DeveloperRouter {
         &self,
         path: &PathBuf,
         view_range: Option<(usize, i64)>,
-    ) -> Result<Vec<Content>, ToolError> {
+    ) -> Result<Vec<Content>, ErrorData> {
         if path.is_file() {
             // Check file size first (400KB limit)
             const MAX_FILE_SIZE: u64 = 400 * 1024; // 400KB in bytes
@@ -941,33 +941,33 @@ impl DeveloperRouter {
 
             let file_size = std::fs::metadata(path)
                 .map_err(|e| {
-                    ToolError::ExecutionError(format!("Failed to get file metadata: {}", e))
+                    ErrorData::new(ErrorCode::INTERNAL_ERROR, format!("Failed to get file metadata: {}", e), None)
                 })?
                 .len();
 
             if file_size > MAX_FILE_SIZE {
-                return Err(ToolError::ExecutionError(format!(
+                return Err(ErrorData::new(ErrorCode::INTERNAL_ERROR, format!(
                     "File '{}' is too large ({:.2}KB). Maximum size is 400KB to prevent memory issues.",
                     path.display(),
                     file_size as f64 / 1024.0
-                )));
+                ), None));
             }
 
             let uri = Url::from_file_path(path)
-                .map_err(|_| ToolError::ExecutionError("Invalid file path".into()))?
+                .map_err(|_| ErrorData::new(ErrorCode::INTERNAL_ERROR, "Invalid file path".into(), None))?
                 .to_string();
 
             let content = std::fs::read_to_string(path)
-                .map_err(|e| ToolError::ExecutionError(format!("Failed to read file: {}", e)))?;
+                .map_err(|e| ErrorData::new(ErrorCode::INTERNAL_ERROR, format!("Failed to read file: {}", e), None))?;
 
             let char_count = content.chars().count();
             if char_count > MAX_CHAR_COUNT {
-                return Err(ToolError::ExecutionError(format!(
+                return Err(ErrorData::new(ErrorCode::INTERNAL_ERROR, format!(
                     "File '{}' has too many characters ({}). Maximum character count is {}.",
                     path.display(),
                     char_count,
                     MAX_CHAR_COUNT
-                )));
+                ), None));
             }
 
             let lines: Vec<&str> = content.lines().collect();
@@ -984,17 +984,17 @@ impl DeveloperRouter {
                 };
 
                 if start_idx >= total_lines {
-                    return Err(ToolError::InvalidParameters(format!(
+                    return Err(ErrorData::new(ErrorCode::INVALID_PARAMS, format!(
                         "Start line {} is beyond the end of the file (total lines: {})",
                         start_line, total_lines
-                    )));
+                    ), None));
                 }
 
                 if start_idx >= end_idx {
-                    return Err(ToolError::InvalidParameters(format!(
+                    return Err(ErrorData::new(ErrorCode::INVALID_PARAMS, format!(
                         "Start line {} must be less than end line {}",
                         start_line, end_line
-                    )));
+                    ), None));
                 }
 
                 (start_idx, end_idx)
@@ -1051,10 +1051,10 @@ impl DeveloperRouter {
                     .with_priority(0.0),
             ])
         } else {
-            Err(ToolError::ExecutionError(format!(
+            Err(ErrorData::new(ErrorCode::INTERNAL_ERROR, format!(
                 "The path '{}' does not exist or is not a file.",
                 path.display()
-            )))
+            ), None))
         }
     }
 
