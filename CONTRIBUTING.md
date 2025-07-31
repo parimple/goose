@@ -219,7 +219,11 @@ This project follows the [Conventional Commits](https://www.conventionalcommits.
 
 ## Developer Certificate of Origin
 
-This project requires [Developer Certificate of Origin](https://en.wikipedia.org/wiki/Developer_Certificate_of_Origin) sign-offs on all commits. Before committing, make sure you understand what the Developer Certificate of Origin is. When you are ready to commit, use the `--signoff` flag (`git commit --signoff ...`) to attach the sign-off to your commit. PRs with commits that are missing DCO sign-offs will not be accepted.
+This project requires a [Developer Certificate of Origin](https://en.wikipedia.org/wiki/Developer_Certificate_of_Origin) sign-offs on all commits. This is a statement indicating that you are allowed to make the contribution and that the project has the right to distribute it under its license. When you are ready to commit, use the `--signoff` flag to attach the sign-off to your commit. 
+
+```
+git commit --signoff ...
+```
 
 ## Other Ways to Contribute
 
