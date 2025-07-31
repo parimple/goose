@@ -1091,6 +1091,37 @@
           }
         }
       },
+      "Annotated": {
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/RawTextContent"
+          },
+          {
+            "$ref": "#/components/schemas/RawImageContent"
+          },
+          {
+            "$ref": "#/components/schemas/RawEmbeddedResource"
+          }
+        ]
+      },
+      "Annotations": {
+        "type": "object",
+        "properties": {
+          "audience": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Role"
+            }
+          },
+          "priority": {
+            "type": "number"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
       "Author": {
         "type": "object",
         "properties": {
@@ -1166,6 +1197,38 @@
             "additionalProperties": {}
           }
         }
+      },
+      "Content": {
+        "oneOf": [
+          {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/RawTextContent"
+              }
+            ]
+          },
+          {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/RawImageContent"
+              }
+            ]
+          },
+          {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/RawEmbeddedResource"
+              }
+            ]
+          },
+          {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/Annotated"
+              }
+            ]
+          }
+        ]
       },
       "ContextLengthExceeded": {
         "type": "object",
@@ -1320,6 +1383,27 @@
         "properties": {
           "recipe": {
             "$ref": "#/components/schemas/Recipe"
+          }
+        }
+      },
+      "EmbeddedResource": {
+        "type": "object",
+        "required": [
+          "resource"
+        ],
+        "properties": {
+          "annotations": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Annotations"
+              },
+              {
+                "type": "object"
+              }
+            ]
+          },
+          "resource": {
+            "$ref": "#/components/schemas/ResourceContents"
           }
         }
       },
@@ -1702,6 +1786,31 @@
           },
           "toolCall": {
             "type": "object"
+          }
+        }
+      },
+      "ImageContent": {
+        "type": "object",
+        "required": [
+          "data",
+          "mimeType"
+        ],
+        "properties": {
+          "annotations": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Annotations"
+              },
+              {
+                "type": "object"
+              }
+            ]
+          },
+          "data": {
+            "type": "string"
+          },
+          "mimeType": {
+            "type": "string"
           }
         }
       },
@@ -2151,6 +2260,43 @@
           }
         }
       },
+      "RawEmbeddedResource": {
+        "type": "object",
+        "required": [
+          "resource"
+        ],
+        "properties": {
+          "resource": {
+            "$ref": "#/components/schemas/ResourceContents"
+          }
+        }
+      },
+      "RawImageContent": {
+        "type": "object",
+        "required": [
+          "data",
+          "mimeType"
+        ],
+        "properties": {
+          "data": {
+            "type": "string"
+          },
+          "mimeType": {
+            "type": "string"
+          }
+        }
+      },
+      "RawTextContent": {
+        "type": "object",
+        "required": [
+          "text"
+        ],
+        "properties": {
+          "text": {
+            "type": "string"
+          }
+        }
+      },
       "Recipe": {
         "type": "object",
         "description": "A Recipe represents a personalized, user-generated agent configuration that defines\nspecific behaviors and capabilities within the Goose system.\n\n# Fields\n\n## Required Fields\n* `version` - Semantic version of the Recipe file format (defaults to \"1.0.0\")\n* `title` - Short, descriptive name of the Recipe\n* `description` - Detailed description explaining the Recipe's purpose and functionality\n* `Instructions` - Instructions that defines the Recipe's behavior\n\n## Optional Fields\n* `prompt` - the initial prompt to the session to start with\n* `extensions` - List of extension configurations required by the Recipe\n* `context` - Supplementary context information for the Recipe\n* `activities` - Activity labels that appear when loading the Recipe\n* `author` - Information about the Recipe's creator and metadata\n* `parameters` - Additional parameters for the Recipe\n* `response` - Response configuration including JSON schema validation\n* `retry` - Retry configuration for automated validation and recovery\n# Example\n\n\nuse goose::recipe::Recipe;\n\n// Using the builder pattern\nlet recipe = Recipe::builder()\n.title(\"Example Agent\")\n.description(\"An example Recipe configuration\")\n.instructions(\"Act as a helpful assistant\")\n.build()\n.expect(\"Missing required fields\");\n\n// Or using struct initialization\nlet recipe = Recipe {\nversion: \"1.0.0\".to_string(),\ntitle: \"Example Agent\".to_string(),\ndescription: \"An example Recipe configuration\".to_string(),\ninstructions: Some(\"Act as a helpful assistant\".to_string()),\nprompt: None,\nextensions: None,\ncontext: None,\nactivities: None,\nauthor: None,\nsettings: None,\nparameters: None,\nresponse: None,\nsub_recipes: None,\nretry: None,\n};\n",
@@ -2309,6 +2455,46 @@
           }
         }
       },
+      "ResourceContents": {
+        "anyOf": [
+          {
+            "type": "object",
+            "required": [
+              "uri",
+              "text"
+            ],
+            "properties": {
+              "mimeType": {
+                "type": "string"
+              },
+              "text": {
+                "type": "string"
+              },
+              "uri": {
+                "type": "string"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "uri",
+              "blob"
+            ],
+            "properties": {
+              "blob": {
+                "type": "string"
+              },
+              "mimeType": {
+                "type": "string"
+              },
+              "uri": {
+                "type": "string"
+              }
+            }
+          }
+        ]
+      },
       "Response": {
         "type": "object",
         "properties": {
@@ -2358,6 +2544,16 @@
             "minimum": 0
           }
         }
+      },
+      "Role": {
+        "oneOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "string"
+          }
+        ]
       },
       "RunNowResponse": {
         "type": "object",
@@ -2704,6 +2900,27 @@
           }
         }
       },
+      "TextContent": {
+        "type": "object",
+        "required": [
+          "text"
+        ],
+        "properties": {
+          "annotations": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Annotations"
+              },
+              {
+                "type": "object"
+              }
+            ]
+          },
+          "text": {
+            "type": "string"
+          }
+        }
+      },
       "ThinkingContent": {
         "type": "object",
         "required": [
@@ -2715,6 +2932,55 @@
             "type": "string"
           },
           "thinking": {
+            "type": "string"
+          }
+        }
+      },
+      "Tool": {
+        "type": "object",
+        "required": [
+          "name",
+          "inputSchema"
+        ],
+        "properties": {
+          "annotations": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ToolAnnotations"
+              },
+              {
+                "type": "object"
+              }
+            ]
+          },
+          "description": {
+            "type": "string"
+          },
+          "inputSchema": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "name": {
+            "type": "string"
+          }
+        }
+      },
+      "ToolAnnotations": {
+        "type": "object",
+        "properties": {
+          "destructiveHint": {
+            "type": "boolean"
+          },
+          "idempotentHint": {
+            "type": "boolean"
+          },
+          "openWorldHint": {
+            "type": "boolean"
+          },
+          "readOnlyHint": {
+            "type": "boolean"
+          },
+          "title": {
             "type": "string"
           }
         }
@@ -2857,375 +3123,6 @@
             }
           }
         }
-      },
-      "Content": {
-        "oneOf": [
-          {
-            "required": [
-              "type"
-            ],
-            "type": "object",
-            "properties": {
-              "type": {
-                "type": "string",
-                "enum": [
-                  "text"
-                ]
-              }
-            },
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/RawTextContent"
-              }
-            ]
-          },
-          {
-            "required": [
-              "type"
-            ],
-            "type": "object",
-            "properties": {
-              "type": {
-                "type": "string",
-                "enum": [
-                  "image"
-                ]
-              }
-            },
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/RawImageContent"
-              }
-            ]
-          },
-          {
-            "required": [
-              "type"
-            ],
-            "type": "object",
-            "properties": {
-              "type": {
-                "type": "string",
-                "enum": [
-                  "resource"
-                ]
-              }
-            },
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/RawEmbeddedResource"
-              }
-            ]
-          }
-        ],
-        "title": "Content"
-      },
-      "EmbeddedResource": {
-        "type": "object",
-        "properties": {
-          "resource": {
-            "$ref": "#/components/schemas/ResourceContents"
-          },
-          "annotations": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/Annotations"
-              },
-              {
-                "nullable": true,
-                "enum": [
-                  null
-                ]
-              }
-            ]
-          }
-        },
-        "required": [
-          "resource"
-        ],
-        "title": "Annotated"
-      },
-      "ImageContent": {
-        "type": "object",
-        "properties": {
-          "data": {
-            "type": "string",
-            "description": "The base64-encoded image"
-          },
-          "mimeType": {
-            "type": "string"
-          },
-          "annotations": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/Annotations"
-              },
-              {
-                "nullable": true,
-                "enum": [
-                  null
-                ]
-              }
-            ]
-          }
-        },
-        "required": [
-          "data",
-          "mimeType"
-        ],
-        "title": "Annotated"
-      },
-      "Annotations": {
-        "type": "object",
-        "properties": {
-          "audience": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/Role"
-            },
-            "nullable": true
-          },
-          "priority": {
-            "type": "number",
-            "format": "float",
-            "nullable": true
-          },
-          "timestamp": {
-            "type": "string",
-            "format": "date-time",
-            "nullable": true
-          }
-        },
-        "title": "Annotations"
-      },
-      "TextContent": {
-        "type": "object",
-        "properties": {
-          "text": {
-            "type": "string"
-          },
-          "annotations": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/Annotations"
-              },
-              {
-                "nullable": true,
-                "enum": [
-                  null
-                ]
-              }
-            ]
-          }
-        },
-        "required": [
-          "text"
-        ],
-        "title": "Annotated"
-      },
-      "ResourceContents": {
-        "anyOf": [
-          {
-            "type": "object",
-            "properties": {
-              "uri": {
-                "type": "string"
-              },
-              "mime_type": {
-                "type": "string",
-                "nullable": true
-              },
-              "text": {
-                "type": "string"
-              }
-            },
-            "required": [
-              "uri",
-              "text"
-            ]
-          },
-          {
-            "type": "object",
-            "properties": {
-              "uri": {
-                "type": "string"
-              },
-              "mime_type": {
-                "type": "string",
-                "nullable": true
-              },
-              "blob": {
-                "type": "string"
-              }
-            },
-            "required": [
-              "uri",
-              "blob"
-            ]
-          }
-        ],
-        "title": "ResourceContents"
-      },
-      "Role": {
-        "oneOf": [
-          {
-            "type": "string",
-            "description": "A human user or client making a request",
-            "enum": [
-              "user"
-            ]
-          },
-          {
-            "type": "string",
-            "description": "An AI assistant or server providing a response",
-            "enum": [
-              "assistant"
-            ]
-          }
-        ],
-        "description": "Represents the role of a participant in a conversation or message exchange.\n\nUsed in sampling and chat contexts to distinguish between different\ntypes of message senders in the conversation flow.",
-        "title": "Role"
-      },
-      "Tool": {
-        "type": "object",
-        "properties": {
-          "name": {
-            "type": "string",
-            "description": "The name of the tool"
-          },
-          "description": {
-            "type": "string",
-            "description": "A description of what the tool does",
-            "nullable": true
-          },
-          "inputSchema": {
-            "type": "object",
-            "description": "A JSON Schema object defining the expected parameters for the tool",
-            "additionalProperties": true
-          },
-          "annotations": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/ToolAnnotations"
-              },
-              {
-                "nullable": true,
-                "enum": [
-                  null
-                ]
-              }
-            ],
-            "description": "Optional additional tool information."
-          }
-        },
-        "required": [
-          "name",
-          "inputSchema"
-        ],
-        "description": "A tool that can be used by a model.",
-        "title": "Tool"
-      },
-      "ToolAnnotations": {
-        "type": "object",
-        "properties": {
-          "title": {
-            "type": "string",
-            "description": "A human-readable title for the tool.",
-            "nullable": true
-          },
-          "readOnlyHint": {
-            "type": "boolean",
-            "description": "If true, the tool does not modify its environment.\n\nDefault: false",
-            "nullable": true
-          },
-          "destructiveHint": {
-            "type": "boolean",
-            "description": "If true, the tool may perform destructive updates to its environment.\nIf false, the tool performs only additive updates.\n\n(This property is meaningful only when `readOnlyHint == false`)\n\nDefault: true\nA human-readable description of the tool's purpose.",
-            "nullable": true
-          },
-          "idempotentHint": {
-            "type": "boolean",
-            "description": "If true, calling the tool repeatedly with the same arguments\nwill have no additional effect on the its environment.\n\n(This property is meaningful only when `readOnlyHint == false`)\n\nDefault: false.",
-            "nullable": true
-          },
-          "openWorldHint": {
-            "type": "boolean",
-            "description": "If true, this tool may interact with an \"open world\" of external\nentities. If false, the tool's domain of interaction is closed.\nFor example, the world of a web search tool is open, whereas that\nof a memory tool is not.\n\nDefault: true",
-            "nullable": true
-          }
-        },
-        "description": "Additional properties describing a Tool to clients.\n\nNOTE: all properties in ToolAnnotations are **hints**.\nThey are not guaranteed to provide a faithful description of\ntool behavior (including descriptive properties like `title`).\n\nClients should never make tool use decisions based on ToolAnnotations\nreceived from untrusted servers.",
-        "title": "ToolAnnotations"
-      },
-      "RawTextContent": {
-        "type": "object",
-        "properties": {
-          "text": {
-            "type": "string"
-          }
-        },
-        "required": [
-          "text"
-        ],
-        "title": "RawTextContent"
-      },
-      "RawImageContent": {
-        "type": "object",
-        "properties": {
-          "data": {
-            "type": "string",
-            "description": "The base64-encoded image"
-          },
-          "mimeType": {
-            "type": "string"
-          }
-        },
-        "required": [
-          "data",
-          "mimeType"
-        ],
-        "title": "RawImageContent"
-      },
-      "RawEmbeddedResource": {
-        "type": "object",
-        "properties": {
-          "resource": {
-            "$ref": "#/components/schemas/ResourceContents"
-          }
-        },
-        "required": [
-          "resource"
-        ],
-        "title": "RawEmbeddedResource"
-      },
-      "AudioContent": {
-        "type": "object",
-        "properties": {
-          "data": {
-            "type": "string"
-          },
-          "mimeType": {
-            "type": "string"
-          },
-          "annotations": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/Annotations"
-              },
-              {
-                "nullable": true,
-                "enum": [
-                  null
-                ]
-              }
-            ]
-          }
-        },
-        "required": [
-          "data",
-          "mimeType"
-        ],
-        "title": "Annotated"
       }
     }
   }

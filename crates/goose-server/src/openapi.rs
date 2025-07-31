@@ -11,82 +11,344 @@ use goose::permission::permission_confirmation::PrincipalType;
 use goose::providers::base::{ConfigKey, ModelInfo, ProviderMetadata};
 use goose::session::info::SessionInfo;
 use goose::session::SessionMetadata;
-use rmcp::model::AudioContent;
-use rmcp::model::RawEmbeddedResource;
-use rmcp::model::RawImageContent;
-use rmcp::model::RawTextContent;
 use rmcp::model::{
-    Annotations, EmbeddedResource, ImageContent, ResourceContents, Role, TextContent, Tool,
-    ToolAnnotations,
+    Annotations, Content, EmbeddedResource, ImageContent, RawEmbeddedResource, RawImageContent,
+    RawTextContent, ResourceContents, Role, TextContent, Tool, ToolAnnotations,
 };
-use schemars::JsonSchema;
-use utoipa::OpenApi;
+use utoipa::{OpenApi, ToSchema};
 
-fn openapi_schema_for<T: JsonSchema>(name: String) -> Vec<(String, serde_json::Value)> {
-    let mut schemas: Vec<(String, serde_json::Value)> = vec![];
+use utoipa::openapi::schema::{
+    AdditionalProperties, AnyOfBuilder, ArrayBuilder, ObjectBuilder, OneOfBuilder, Schema,
+    SchemaFormat, SchemaType,
+};
+use utoipa::openapi::{AllOfBuilder, Ref, RefOr};
 
-    let settings = rmcp::schemars::generate::SchemaSettings::openapi3();
-    let generator = settings.into_generator();
-    let schema = generator.into_root_schema_for::<T>().to_value();
-    let schema = schema.as_object().unwrap();
-    let mut parent = schema.clone();
-    parent.remove("components");
-    parent.remove("$schema");
+macro_rules! derive_utoipa {
+    ($inner_type:ident as $schema_name:ident) => {
+        struct $schema_name {}
 
-    schemas.push((name, parent.into()));
-
-    for subschema in schema
-        .get("components")
-        .and_then(|c| c.get("schemas"))
-        .and_then(|s| s.as_object())
-        .into_iter()
-        .flat_map(|o| o.values())
-    {
-        if let serde_json::Value::Object(obj) = subschema {
-            if let Some(title) = obj.get("title").and_then(|t| t.as_str()) {
-                schemas.push((title.to_string(), subschema.clone()));
+        impl<'__s> ToSchema<'__s> for $schema_name {
+            fn schema() -> (&'__s str, utoipa::openapi::RefOr<utoipa::openapi::Schema>) {
+                let settings = rmcp::schemars::generate::SchemaSettings::openapi3();
+                let generator = settings.into_generator();
+                let schema = generator.into_root_schema_for::<$inner_type>();
+                let schema = convert_schemars_to_utoipa(schema);
+                (stringify!($inner_type), schema)
             }
-        }
-    }
 
-    schemas
-}
-
-trait OpenApiExt {
-    fn schemas() -> Vec<(String, serde_json::Value)>;
-}
-
-macro_rules! derive_schemas {
-    ($inner_type:ident) => {
-        impl OpenApiExt for $inner_type {
-            fn schemas() -> Vec<(String, serde_json::Value)> {
-                openapi_schema_for::<$inner_type>(stringify!($inner_type).to_string())
+            fn aliases() -> Vec<(&'__s str, utoipa::openapi::schema::Schema)> {
+                Vec::new()
             }
         }
     };
 }
 
-#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize, schemars::JsonSchema)]
-#[serde(tag = "type", rename_all = "camelCase")]
-enum Content {
-    Text(RawTextContent),
-    Image(RawImageContent),
-    Resource(RawEmbeddedResource),
+fn convert_schemars_to_utoipa(schema: rmcp::schemars::Schema) -> RefOr<Schema> {
+    // For schemars 1.0+, we need to work with the public API
+    // The schema is now a wrapper around a JSON Value that can be either an object or bool
+    if let Some(true) = schema.as_bool() {
+        return RefOr::T(Schema::Object(ObjectBuilder::new().build()));
+    }
+
+    if let Some(false) = schema.as_bool() {
+        return RefOr::T(Schema::Object(ObjectBuilder::new().build()));
+    }
+
+    // For object schemas, we'll need to work with the JSON Value directly
+    if let Some(obj) = schema.as_object() {
+        return convert_json_object_to_utoipa(obj);
+    }
+
+    // Fallback
+    RefOr::T(Schema::Object(ObjectBuilder::new().build()))
 }
 
-derive_schemas!(Role);
-derive_schemas!(Content);
-derive_schemas!(EmbeddedResource);
-derive_schemas!(ImageContent);
-derive_schemas!(TextContent);
-derive_schemas!(AudioContent);
-derive_schemas!(Tool);
-derive_schemas!(ToolAnnotations);
-derive_schemas!(Annotations);
-derive_schemas!(ResourceContents);
-derive_schemas!(RawTextContent);
-derive_schemas!(RawImageContent);
-derive_schemas!(RawEmbeddedResource);
+fn convert_json_object_to_utoipa(
+    obj: &serde_json::Map<String, serde_json::Value>,
+) -> RefOr<Schema> {
+    use serde_json::Value;
+
+    // Handle $ref
+    if let Some(Value::String(reference)) = obj.get("$ref") {
+        return RefOr::Ref(Ref::new(reference.clone()));
+    }
+
+    // Handle oneOf, allOf, anyOf
+    if let Some(Value::Array(one_of)) = obj.get("oneOf") {
+        let mut builder = OneOfBuilder::new();
+        for item in one_of {
+            if let Ok(schema) = rmcp::schemars::Schema::try_from(item.clone()) {
+                builder = builder.item(convert_schemars_to_utoipa(schema));
+            }
+        }
+        return RefOr::T(Schema::OneOf(builder.build()));
+    }
+
+    if let Some(Value::Array(all_of)) = obj.get("allOf") {
+        let mut builder = AllOfBuilder::new();
+        for item in all_of {
+            if let Ok(schema) = rmcp::schemars::Schema::try_from(item.clone()) {
+                builder = builder.item(convert_schemars_to_utoipa(schema));
+            }
+        }
+        return RefOr::T(Schema::AllOf(builder.build()));
+    }
+
+    if let Some(Value::Array(any_of)) = obj.get("anyOf") {
+        let mut builder = AnyOfBuilder::new();
+        for item in any_of {
+            if let Ok(schema) = rmcp::schemars::Schema::try_from(item.clone()) {
+                builder = builder.item(convert_schemars_to_utoipa(schema));
+            }
+        }
+        return RefOr::T(Schema::AnyOf(builder.build()));
+    }
+
+    // Handle type-based schemas
+    match obj.get("type") {
+        Some(Value::String(type_str)) => convert_typed_schema(type_str, obj),
+        Some(Value::Array(types)) => {
+            // Multiple types - use AnyOf
+            let mut builder = AnyOfBuilder::new();
+            for type_val in types {
+                if let Value::String(type_str) = type_val {
+                    builder = builder.item(convert_typed_schema(type_str, obj));
+                }
+            }
+            RefOr::T(Schema::AnyOf(builder.build()))
+        }
+        None => RefOr::T(Schema::Object(ObjectBuilder::new().build())),
+        _ => RefOr::T(Schema::Object(ObjectBuilder::new().build())), // Handle other value types
+    }
+}
+
+fn convert_typed_schema(
+    type_str: &str,
+    obj: &serde_json::Map<String, serde_json::Value>,
+) -> RefOr<Schema> {
+    use serde_json::Value;
+
+    match type_str {
+        "object" => {
+            let mut object_builder = ObjectBuilder::new();
+
+            // Add properties
+            if let Some(Value::Object(properties)) = obj.get("properties") {
+                for (name, prop_value) in properties {
+                    if let Ok(prop_schema) = rmcp::schemars::Schema::try_from(prop_value.clone()) {
+                        let prop = convert_schemars_to_utoipa(prop_schema);
+                        object_builder = object_builder.property(name, prop);
+                    }
+                }
+            }
+
+            // Add required fields
+            if let Some(Value::Array(required)) = obj.get("required") {
+                for req in required {
+                    if let Value::String(field_name) = req {
+                        object_builder = object_builder.required(field_name);
+                    }
+                }
+            }
+
+            // Handle additional properties
+            if let Some(additional) = obj.get("additionalProperties") {
+                match additional {
+                    Value::Bool(false) => {
+                        object_builder = object_builder
+                            .additional_properties(Some(AdditionalProperties::FreeForm(false)));
+                    }
+                    Value::Bool(true) => {
+                        object_builder = object_builder
+                            .additional_properties(Some(AdditionalProperties::FreeForm(true)));
+                    }
+                    _ => {
+                        if let Ok(schema) = rmcp::schemars::Schema::try_from(additional.clone()) {
+                            let schema = convert_schemars_to_utoipa(schema);
+                            object_builder = object_builder
+                                .additional_properties(Some(AdditionalProperties::RefOr(schema)));
+                        }
+                    }
+                }
+            }
+
+            RefOr::T(Schema::Object(object_builder.build()))
+        }
+        "array" => {
+            let mut array_builder = ArrayBuilder::new();
+
+            // Add items schema
+            if let Some(items) = obj.get("items") {
+                match items {
+                    Value::Object(_) | Value::Bool(_) => {
+                        if let Ok(item_schema) = rmcp::schemars::Schema::try_from(items.clone()) {
+                            let item_schema = convert_schemars_to_utoipa(item_schema);
+                            array_builder = array_builder.items(item_schema);
+                        }
+                    }
+                    Value::Array(item_schemas) => {
+                        // Multiple item types - use AnyOf
+                        let mut any_of = AnyOfBuilder::new();
+                        for item in item_schemas {
+                            if let Ok(schema) = rmcp::schemars::Schema::try_from(item.clone()) {
+                                any_of = any_of.item(convert_schemars_to_utoipa(schema));
+                            }
+                        }
+                        let any_of_schema = RefOr::T(Schema::AnyOf(any_of.build()));
+                        array_builder = array_builder.items(any_of_schema);
+                    }
+                    _ => {}
+                }
+            }
+
+            // Add constraints
+            if let Some(Value::Number(min_items)) = obj.get("minItems") {
+                if let Some(min) = min_items.as_u64() {
+                    array_builder = array_builder.min_items(Some(min as usize));
+                }
+            }
+            if let Some(Value::Number(max_items)) = obj.get("maxItems") {
+                if let Some(max) = max_items.as_u64() {
+                    array_builder = array_builder.max_items(Some(max as usize));
+                }
+            }
+
+            RefOr::T(Schema::Array(array_builder.build()))
+        }
+        "string" => {
+            let mut object_builder = ObjectBuilder::new().schema_type(SchemaType::String);
+
+            if let Some(Value::Number(min_length)) = obj.get("minLength") {
+                if let Some(min) = min_length.as_u64() {
+                    object_builder = object_builder.min_length(Some(min as usize));
+                }
+            }
+            if let Some(Value::Number(max_length)) = obj.get("maxLength") {
+                if let Some(max) = max_length.as_u64() {
+                    object_builder = object_builder.max_length(Some(max as usize));
+                }
+            }
+            if let Some(Value::String(pattern)) = obj.get("pattern") {
+                object_builder = object_builder.pattern(Some(pattern.clone()));
+            }
+            if let Some(Value::String(format)) = obj.get("format") {
+                object_builder = object_builder.format(Some(SchemaFormat::Custom(format.clone())));
+            }
+
+            RefOr::T(Schema::Object(object_builder.build()))
+        }
+        "number" => {
+            let mut object_builder = ObjectBuilder::new().schema_type(SchemaType::Number);
+
+            if let Some(Value::Number(minimum)) = obj.get("minimum") {
+                if let Some(min) = minimum.as_f64() {
+                    object_builder = object_builder.minimum(Some(min));
+                }
+            }
+            if let Some(Value::Number(maximum)) = obj.get("maximum") {
+                if let Some(max) = maximum.as_f64() {
+                    object_builder = object_builder.maximum(Some(max));
+                }
+            }
+            if let Some(Value::Number(exclusive_minimum)) = obj.get("exclusiveMinimum") {
+                if let Some(min) = exclusive_minimum.as_f64() {
+                    object_builder = object_builder.exclusive_minimum(Some(min));
+                }
+            }
+            if let Some(Value::Number(exclusive_maximum)) = obj.get("exclusiveMaximum") {
+                if let Some(max) = exclusive_maximum.as_f64() {
+                    object_builder = object_builder.exclusive_maximum(Some(max));
+                }
+            }
+            if let Some(Value::Number(multiple_of)) = obj.get("multipleOf") {
+                if let Some(mult) = multiple_of.as_f64() {
+                    object_builder = object_builder.multiple_of(Some(mult));
+                }
+            }
+
+            RefOr::T(Schema::Object(object_builder.build()))
+        }
+        "integer" => {
+            let mut object_builder = ObjectBuilder::new().schema_type(SchemaType::Integer);
+
+            if let Some(Value::Number(minimum)) = obj.get("minimum") {
+                if let Some(min) = minimum.as_f64() {
+                    object_builder = object_builder.minimum(Some(min));
+                }
+            }
+            if let Some(Value::Number(maximum)) = obj.get("maximum") {
+                if let Some(max) = maximum.as_f64() {
+                    object_builder = object_builder.maximum(Some(max));
+                }
+            }
+            if let Some(Value::Number(exclusive_minimum)) = obj.get("exclusiveMinimum") {
+                if let Some(min) = exclusive_minimum.as_f64() {
+                    object_builder = object_builder.exclusive_minimum(Some(min));
+                }
+            }
+            if let Some(Value::Number(exclusive_maximum)) = obj.get("exclusiveMaximum") {
+                if let Some(max) = exclusive_maximum.as_f64() {
+                    object_builder = object_builder.exclusive_maximum(Some(max));
+                }
+            }
+            if let Some(Value::Number(multiple_of)) = obj.get("multipleOf") {
+                if let Some(mult) = multiple_of.as_f64() {
+                    object_builder = object_builder.multiple_of(Some(mult));
+                }
+            }
+
+            RefOr::T(Schema::Object(object_builder.build()))
+        }
+        "boolean" => RefOr::T(Schema::Object(
+            ObjectBuilder::new()
+                .schema_type(SchemaType::Boolean)
+                .build(),
+        )),
+        "null" => RefOr::T(Schema::Object(
+            ObjectBuilder::new().schema_type(SchemaType::String).build(),
+        )),
+        _ => RefOr::T(Schema::Object(ObjectBuilder::new().build())),
+    }
+}
+
+derive_utoipa!(Role as RoleSchema);
+derive_utoipa!(Content as ContentSchema);
+derive_utoipa!(EmbeddedResource as EmbeddedResourceSchema);
+derive_utoipa!(ImageContent as ImageContentSchema);
+derive_utoipa!(TextContent as TextContentSchema);
+derive_utoipa!(RawTextContent as RawTextContentSchema);
+derive_utoipa!(RawImageContent as RawImageContentSchema);
+derive_utoipa!(RawEmbeddedResource as RawEmbeddedResourceSchema);
+derive_utoipa!(Tool as ToolSchema);
+derive_utoipa!(ToolAnnotations as ToolAnnotationsSchema);
+derive_utoipa!(Annotations as AnnotationsSchema);
+derive_utoipa!(ResourceContents as ResourceContentsSchema);
+
+// Create a manual schema for the generic Annotated type
+// We manually define this to avoid circular references from RawContent::Audio(AudioContent)
+// where AudioContent = Annotated<RawAudioContent>
+struct AnnotatedSchema {}
+
+impl<'__s> ToSchema<'__s> for AnnotatedSchema {
+    fn schema() -> (&'__s str, utoipa::openapi::RefOr<utoipa::openapi::Schema>) {
+        // Create a oneOf schema with only the variants we actually use in the API
+        // This avoids the circular reference from RawContent::Audio(AudioContent)
+        let schema = Schema::OneOf(
+            OneOfBuilder::new()
+                .item(RefOr::Ref(Ref::new("#/components/schemas/RawTextContent")))
+                .item(RefOr::Ref(Ref::new("#/components/schemas/RawImageContent")))
+                .item(RefOr::Ref(Ref::new(
+                    "#/components/schemas/RawEmbeddedResource",
+                )))
+                .build(),
+        );
+        ("Annotated", RefOr::T(schema))
+    }
+
+    fn aliases() -> Vec<(&'__s str, utoipa::openapi::schema::Schema)> {
+        Vec::new()
+    }
+}
 
 #[allow(dead_code)] // Used by utoipa for OpenAPI generation
 #[derive(OpenApi)]
@@ -142,19 +404,32 @@ derive_schemas!(RawEmbeddedResource);
         super::routes::session::SessionHistoryResponse,
         Message,
         MessageContent,
+        ContentSchema,
+        EmbeddedResourceSchema,
+        ImageContentSchema,
+        AnnotationsSchema,
+        TextContentSchema,
+        RawTextContentSchema,
+        RawImageContentSchema,
+        RawEmbeddedResourceSchema,
+        AnnotatedSchema,
         ToolResponse,
         ToolRequest,
         ToolConfirmationRequest,
         ThinkingContent,
         RedactedThinkingContent,
         FrontendToolRequest,
+        ResourceContentsSchema,
         ContextLengthExceeded,
         SummarizationRequested,
+        RoleSchema,
         ProviderMetadata,
         ExtensionEntry,
         ExtensionConfig,
         ConfigKey,
         Envs,
+        ToolSchema,
+        ToolAnnotationsSchema,
         ToolInfo,
         PermissionLevel,
         PrincipalType,
@@ -193,32 +468,8 @@ derive_schemas!(RawEmbeddedResource);
 )]
 pub struct ApiDoc;
 
-macro_rules! insert_schemas {
-    ($schema_type:ident, $schemas_map:ident) => {
-        for (name, schema) in $schema_type::schemas() {
-            $schemas_map.insert(name, schema);
-        }
-    };
-}
-
 #[allow(dead_code)] // Used by generate_schema binary
 pub fn generate_schema() -> String {
     let api_doc = ApiDoc::openapi();
-    let mut api_doc_value = serde_json::to_value(&api_doc).unwrap();
-    if let Some(schemas) = api_doc_value["components"]["schemas"].as_object_mut() {
-        insert_schemas!(Content, schemas);
-        insert_schemas!(EmbeddedResource, schemas);
-        insert_schemas!(ImageContent, schemas);
-        insert_schemas!(Annotations, schemas);
-        insert_schemas!(TextContent, schemas);
-        insert_schemas!(ResourceContents, schemas);
-        insert_schemas!(Role, schemas);
-        insert_schemas!(Tool, schemas);
-        insert_schemas!(ToolAnnotations, schemas);
-        insert_schemas!(RawTextContent, schemas);
-        insert_schemas!(RawImageContent, schemas);
-        insert_schemas!(RawEmbeddedResource, schemas);
-        insert_schemas!(AudioContent, schemas);
-    }
-    serde_json::to_string_pretty(&api_doc_value).unwrap()
+    serde_json::to_string_pretty(&api_doc).unwrap()
 }
