@@ -49,7 +49,7 @@ impl MorphLLMEditor {
                     original_code, code_content
                 );
             }
-        }        
+        }
         format!(
             "<code>{}</code>\n<update>{}</update>",
             original_code, update_snippet
