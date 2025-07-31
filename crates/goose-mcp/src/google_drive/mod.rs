@@ -8,7 +8,7 @@ use chrono::NaiveDate;
 use indoc::indoc;
 use lazy_static::lazy_static;
 use mcp_core::{
-    handler::{PromptError, ResourceError, ErrorData},
+    handler::{PromptError, ResourceError},
     protocol::ServerCapabilities,
 };
 use mcp_server::router::CapabilitiesBuilder;
@@ -16,7 +16,7 @@ use mcp_server::Router;
 use oauth_pkce::PkceOAuth2Client;
 use regex::Regex;
 use rmcp::model::{
-    AnnotateAble, Content, JsonRpcMessage, Prompt, RawResource, Resource, Tool, ToolAnnotations,, ErrorData, ErrorCode};
+    AnnotateAble, Content, JsonRpcMessage, Prompt, RawResource, Resource, Tool, ToolAnnotations, ErrorData, ErrorCode};
 use rmcp::object;
 use serde_json::{json, Value};
 use std::borrow::Cow;
@@ -993,7 +993,7 @@ impl GoogleDriveRouter {
         let drive_type = params.get("driveType").and_then(|q| q.as_str()).ok_or(
             ErrorData {
             code: ErrorCode::INVALID_PARAMS,
-            message: Cow::from("The type is required".to_string(),
+            message: Cow::from("The type is required".to_string()),
             data: None,
         }),
         )?;
@@ -1002,12 +1002,7 @@ impl GoogleDriveRouter {
             "label" => return self.list_labels(params).await,
             t => Err(ErrorData {
             code: ErrorCode::INVALID_PARAMS,
-            message: Cow::from(format!(
-                "type must be one of ('file', 'label'),
-            data: None,
-        }, got {}",
-                t
-            ))),
+            message: Cow::from(format!("type must be one of (\'file\', \'label\'), got {}", t))),
         }
     }
 
@@ -1027,9 +1022,7 @@ impl GoogleDriveRouter {
                 } else {
                     Err(ErrorData {
             code: ErrorCode::INVALID_PARAMS,
-            message: Cow::from(format!(
-                        "corpora must be either 'user', 'drive', or 'allDrives', got {}",
-                        s),
+            message: Cow::from(format!("corpora must be either 'user', 'drive', or 'allDrives', got {}", s)),
             data: None,
         }))
                 }
@@ -1044,7 +1037,7 @@ impl GoogleDriveRouter {
                     .and_then(|n| i32::try_from(n).ok())
                     .ok_or_else(|| ErrorData {
             code: ErrorCode::INVALID_PARAMS,
-            message: Cow::from(format!("Invalid pageSize: {}", s),
+            message: Cow::from(format!("Invalid pageSize: {}", s)),
             data: None,
         }))
                     .and_then(|n| {
@@ -1053,9 +1046,7 @@ impl GoogleDriveRouter {
                         } else {
                             Err(ErrorData {
             code: ErrorCode::INVALID_PARAMS,
-            message: Cow::from(format!(
-                                "pageSize must be between 0 and 100, got {}",
-                                n),
+            message: Cow::from(format!("pageSize must be between 0 and 100, got {}", n)),
             data: None,
         }))
                         }
@@ -1087,12 +1078,10 @@ impl GoogleDriveRouter {
         let query_string = query.join(" and ");
         if query_string.is_empty() {
             return Err(ErrorData {
-            code: ErrorCode::INVALID_PARAMS,
-            message: Cow::from("No query provided. Please include one of ('name', 'mimeType', 'parent'),
-            data: None,
-        }."
-                    .to_string(),
-            ));
+                code: ErrorCode::INVALID_PARAMS,
+                message: Cow::from("No query provided. Please include one of (\'name\', \'mimeType\', \'parent\').".to_string()),
+                data: None
+            });
         }
         let mut builder = self
             .drive
@@ -1132,9 +1121,7 @@ impl GoogleDriveRouter {
                 Err(e) => {
                     return Err(ErrorData {
             code: ErrorCode::INTERNAL_ERROR,
-            message: Cow::from(format!(
-                        "Failed to execute google drive label list '{}'.",
-                        e),
+            message: Cow::from(format!("Failed to execute google drive label list '{}'.", e)),
             data: None,
         }))
                 }
@@ -1151,9 +1138,7 @@ impl GoogleDriveRouter {
         match result {
             Err(e) => Err(ErrorData {
             code: ErrorCode::INTERNAL_ERROR,
-            message: Cow::from(format!(
-                "Failed to execute google drive search query '{}', {}.",
-                query_string.as_str(),
+            message: Cow::from(format!("Failed to execute google drive search query '{}', {}.", query_string.as_str()),
             data: None,
         },
                 e
@@ -1199,9 +1184,7 @@ impl GoogleDriveRouter {
             .map_err(|e| {
                 ErrorData {
             code: ErrorCode::INTERNAL_ERROR,
-            message: Cow::from(format!(
-                    "Failed to execute Google Drive get query, {}.",
-                    e),
+            message: Cow::from(format!("Failed to execute Google Drive get query, {}.", e)),
             data: None,
         })
             })
@@ -1302,9 +1285,7 @@ impl GoogleDriveRouter {
         match result {
             Err(e) => Err(ErrorData {
             code: ErrorCode::INTERNAL_ERROR,
-            message: Cow::from(format!(
-                "Failed to execute google drive export for {}, {}.",
-                uri, e),
+            message: Cow::from(format!("Failed to execute google drive export for {}, {}.", uri, e)),
             data: None,
         })),
             Ok(r) => {
@@ -1317,12 +1298,7 @@ impl GoogleDriveRouter {
                             let images = self.resize_images(&response).map_err(|e| {
                                 ErrorData {
             code: ErrorCode::INTERNAL_ERROR,
-            message: Cow::from(format!(
-                                    "Failed to resize image(s),
-            data: None,
-        }: {}",
-                                    e
-                                ))
+            message: Cow::from(format!("Failed to resize image(s): {}", e))
                             })?;
 
                             let content = self.strip_image_body(&response);
@@ -1333,18 +1309,14 @@ impl GoogleDriveRouter {
                     } else {
                         Err(ErrorData {
             code: ErrorCode::INTERNAL_ERROR,
-            message: Cow::from(format!(
-                            "Failed to export google drive to string, {}.",
-                            uri,),
+            message: Cow::from(format!("Failed to export google drive to string, {}.", uri,)),
             data: None,
         }))
                     }
                 } else {
                     Err(ErrorData {
             code: ErrorCode::INTERNAL_ERROR,
-            message: Cow::from(format!(
-                        "Failed to export google drive document, {}.",
-                        uri,),
+            message: Cow::from(format!("Failed to export google drive document, {}.", uri,)),
             data: None,
         }))
                 }
@@ -1372,9 +1344,7 @@ impl GoogleDriveRouter {
         match result {
             Err(e) => Err(ErrorData {
             code: ErrorCode::INTERNAL_ERROR,
-            message: Cow::from(format!(
-                "Failed to execute google drive export for {}, {}.",
-                uri, e),
+            message: Cow::from(format!("Failed to execute google drive export for {}, {}.", uri, e)),
             data: None,
         })),
             Ok(r) => {
@@ -1388,12 +1358,7 @@ impl GoogleDriveRouter {
                                 let images = self.resize_images(&response).map_err(|e| {
                                     ErrorData {
             code: ErrorCode::INTERNAL_ERROR,
-            message: Cow::from(format!(
-                                        "Failed to resize image(s),
-            data: None,
-        }: {}",
-                                        e
-                                    ))
+            message: Cow::from(format!("Failed to resize image(s): {}", e))
                                 })?;
 
                                 let content = self.strip_image_body(&response);
@@ -1404,18 +1369,14 @@ impl GoogleDriveRouter {
                         } else {
                             Err(ErrorData {
             code: ErrorCode::INTERNAL_ERROR,
-            message: Cow::from(format!(
-                                "Failed to convert google drive to string, {}.",
-                                uri,),
+            message: Cow::from(format!("Failed to convert google drive to string, {}.", uri,)),
             data: None,
         }))
                         }
                     } else {
                         Err(ErrorData {
             code: ErrorCode::INTERNAL_ERROR,
-            message: Cow::from(format!(
-                            "Failed to get google drive document, {}.",
-                            uri,),
+            message: Cow::from(format!("Failed to get google drive document, {}.", uri,)),
             data: None,
         }))
                     }
@@ -1423,9 +1384,7 @@ impl GoogleDriveRouter {
                     //TODO: handle base64 image case, see typscript mcp-gdrive
                     Err(ErrorData {
             code: ErrorCode::INTERNAL_ERROR,
-            message: Cow::from(format!(
-                        "Suported mimeType {}, for {}",
-                        mime_type, uri,),
+            message: Cow::from(format!("Suported mimeType {}, for {}", mime_type, uri,)),
             data: None,
         }))
                 }
@@ -1447,9 +1406,7 @@ impl GoogleDriveRouter {
                 if drive_uri.contains('/') {
                     return Err(ErrorData {
             code: ErrorCode::INVALID_PARAMS,
-            message: Cow::from(format!(
-                        "The uri '{}' contains extra '/'. Only the base URI is allowed.",
-                        uri),
+            message: Cow::from(format!("The uri '{}' contains extra '/'. Only the base URI is allowed.", uri)),
             data: None,
         }));
                 }
@@ -1462,9 +1419,7 @@ impl GoogleDriveRouter {
                 } else {
                     return Err(ErrorData {
             code: ErrorCode::INVALID_PARAMS,
-            message: Cow::from(format!(
-                        "Failed to extract valid google drive URI from {}",
-                        url),
+            message: Cow::from(format!("Failed to extract valid google drive URI from {}", url)),
             data: None,
         }));
                 }
@@ -1472,7 +1427,7 @@ impl GoogleDriveRouter {
             (Some(_), Some(_)) => {
                 return Err(ErrorData {
             code: ErrorCode::INVALID_PARAMS,
-            message: Cow::from("Only one of 'uri' or 'url' should be provided".to_string(),
+            message: Cow::from("Only one of 'uri' or 'url' should be provided".to_string()),
             data: None,
         },
                 ));
@@ -1480,7 +1435,7 @@ impl GoogleDriveRouter {
             (None, None) => {
                 return Err(ErrorData {
             code: ErrorCode::INVALID_PARAMS,
-            message: Cow::from("Either 'uri' or 'url' must be provided".to_string(),
+            message: Cow::from("Either 'uri' or 'url' must be provided".to_string()),
             data: None,
         },
                 ));
@@ -1496,9 +1451,7 @@ impl GoogleDriveRouter {
         let mime_type = metadata.mime_type.ok_or_else(|| {
             ErrorData {
             code: ErrorCode::INTERNAL_ERROR,
-            message: Cow::from(format!(
-                "Missing mime type in file metadata for {}.",
-                drive_uri),
+            message: Cow::from(format!("Missing mime type in file metadata for {}.", drive_uri)),
             data: None,
         })
         })?;
@@ -1518,7 +1471,7 @@ impl GoogleDriveRouter {
         let spreadsheet_id = params.get("spreadsheetId").and_then(|q| q.as_str()).ok_or(
             ErrorData {
             code: ErrorCode::INVALID_PARAMS,
-            message: Cow::from("The spreadsheetId is required".to_string(),
+            message: Cow::from("The spreadsheetId is required".to_string()),
             data: None,
         }),
         )?;
@@ -1526,7 +1479,7 @@ impl GoogleDriveRouter {
         let operation = params.get("operation").and_then(|q| q.as_str()).ok_or(
             ErrorData {
             code: ErrorCode::INVALID_PARAMS,
-            message: Cow::from("The operation is required".to_string(),
+            message: Cow::from("The operation is required".to_string()),
             data: None,
         }),
         )?;
@@ -1546,9 +1499,7 @@ impl GoogleDriveRouter {
                 match result {
                     Err(e) => Err(ErrorData {
             code: ErrorCode::INTERNAL_ERROR,
-            message: Cow::from(format!(
-                        "Failed to execute Google Sheets get query, {}.",
-                        e),
+            message: Cow::from(format!("Failed to execute Google Sheets get query, {}.", e)),
             data: None,
         })),
                     Ok(r) => {
@@ -1596,9 +1547,7 @@ impl GoogleDriveRouter {
                 match result {
                     Err(e) => Err(ErrorData {
             code: ErrorCode::INTERNAL_ERROR,
-            message: Cow::from(format!(
-                        "Failed to execute Google Sheets get_columns query, {}.",
-                        e),
+            message: Cow::from(format!("Failed to execute Google Sheets get_columns query, {}.", e)),
             data: None,
         })),
                     Ok(r) => {
@@ -1627,7 +1576,7 @@ impl GoogleDriveRouter {
                     .and_then(|q| q.as_str())
                     .ok_or(ErrorData {
             code: ErrorCode::INVALID_PARAMS,
-            message: Cow::from("The range is required for get_values operation".to_string(),
+            message: Cow::from("The range is required for get_values operation".to_string()),
             data: None,
         },
                     ))?;
@@ -1644,9 +1593,7 @@ impl GoogleDriveRouter {
                 match result {
                     Err(e) => Err(ErrorData {
             code: ErrorCode::INTERNAL_ERROR,
-            message: Cow::from(format!(
-                        "Failed to execute Google Sheets values_get query, {}.",
-                        e),
+            message: Cow::from(format!("Failed to execute Google Sheets values_get query, {}.", e)),
             data: None,
         })),
                     Ok(r) => {
@@ -1678,7 +1625,7 @@ impl GoogleDriveRouter {
                     .and_then(|q| q.as_str())
                     .ok_or(ErrorData {
             code: ErrorCode::INVALID_PARAMS,
-            message: Cow::from("The range is required for update_values operation".to_string(),
+            message: Cow::from("The range is required for update_values operation".to_string()),
             data: None,
         },
                     ))?;
@@ -1688,7 +1635,7 @@ impl GoogleDriveRouter {
                     .and_then(|q| q.as_str())
                     .ok_or(ErrorData {
             code: ErrorCode::INVALID_PARAMS,
-            message: Cow::from("The values parameter is required for update_values operation".to_string(),
+            message: Cow::from("The values parameter is required for update_values operation".to_string()),
             data: None,
         },
                     ))?;
@@ -1732,9 +1679,7 @@ impl GoogleDriveRouter {
                 match result {
                     Err(e) => Err(ErrorData {
             code: ErrorCode::INTERNAL_ERROR,
-            message: Cow::from(format!(
-                        "Failed to execute Google Sheets values_update query, {}.",
-                        e),
+            message: Cow::from(format!("Failed to execute Google Sheets values_update query, {}.", e)),
             data: None,
         })),
                     Ok(r) => {
@@ -1759,7 +1704,7 @@ impl GoogleDriveRouter {
                     .and_then(|q| q.as_str())
                     .ok_or(ErrorData {
             code: ErrorCode::INVALID_PARAMS,
-            message: Cow::from("The cell parameter is required for update_cell operation".to_string(),
+            message: Cow::from("The cell parameter is required for update_cell operation".to_string()),
             data: None,
         },
                     ))?;
@@ -1769,7 +1714,7 @@ impl GoogleDriveRouter {
                     .and_then(|q| q.as_str())
                     .ok_or(ErrorData {
             code: ErrorCode::INVALID_PARAMS,
-            message: Cow::from("The value parameter is required for update_cell operation".to_string(),
+            message: Cow::from("The value parameter is required for update_cell operation".to_string()),
             data: None,
         },
                     ))?;
@@ -1801,9 +1746,7 @@ impl GoogleDriveRouter {
                 match result {
                     Err(e) => Err(ErrorData {
             code: ErrorCode::INTERNAL_ERROR,
-            message: Cow::from(format!(
-                        "Failed to execute Google Sheets update_cell operation, {}.",
-                        e),
+            message: Cow::from(format!("Failed to execute Google Sheets update_cell operation, {}.", e)),
             data: None,
         })),
                     Ok(r) => {
@@ -1823,7 +1766,7 @@ impl GoogleDriveRouter {
                     .and_then(|q| q.as_str())
                     .ok_or(ErrorData {
             code: ErrorCode::INVALID_PARAMS,
-            message: Cow::from("The title parameter is required for add_sheet operation".to_string(),
+            message: Cow::from("The title parameter is required for add_sheet operation".to_string()),
             data: None,
         },
                     ))?;
@@ -1868,9 +1811,7 @@ impl GoogleDriveRouter {
                 match result {
                     Err(e) => Err(ErrorData {
             code: ErrorCode::INTERNAL_ERROR,
-            message: Cow::from(format!(
-                        "Failed to execute Google Sheets add_sheet operation, {}.",
-                        e),
+            message: Cow::from(format!("Failed to execute Google Sheets add_sheet operation, {}.", e)),
             data: None,
         })),
                     Ok(r) => {
@@ -1907,7 +1848,7 @@ impl GoogleDriveRouter {
                     .and_then(|q| q.as_str())
                     .ok_or(ErrorData {
             code: ErrorCode::INVALID_PARAMS,
-            message: Cow::from("The range is required for clear_values operation".to_string(),
+            message: Cow::from("The range is required for clear_values operation".to_string()),
             data: None,
         },
                     ))?;
@@ -1928,9 +1869,7 @@ impl GoogleDriveRouter {
                 match result {
                     Err(e) => Err(ErrorData {
             code: ErrorCode::INTERNAL_ERROR,
-            message: Cow::from(format!(
-                        "Failed to execute Google Sheets clear_values operation, {}.",
-                        e),
+            message: Cow::from(format!("Failed to execute Google Sheets clear_values operation, {}.", e)),
             data: None,
         })),
                     Ok(r) => {
@@ -1946,9 +1885,7 @@ impl GoogleDriveRouter {
             },
             _ => Err(ErrorData {
             code: ErrorCode::INVALID_PARAMS,
-            message: Cow::from(format!(
-                "Invalid operation: {}. Supported operations are: list_sheets, get_columns, get_values, update_values, update_cell, add_sheet, clear_values",
-                operation),
+            message: Cow::from(format!("Invalid operation: {}. Supported operations are: list_sheets, get_columns, get_values, update_values, update_cell, add_sheet, clear_values", operation)),
             data: None,
         })),
         }
@@ -2081,9 +2018,7 @@ impl GoogleDriveRouter {
         match result {
             Err(e) => Err(ErrorData {
             code: ErrorCode::INTERNAL_ERROR,
-            message: Cow::from(format!(
-                "Failed to upload google drive file {:?}, {}.",
-                operation, e),
+            message: Cow::from(format!("Failed to upload google drive file {:?}, {}.", operation, e)),
             data: None,
         })),
             Ok(r) => Ok(vec![Content::text(format!(
@@ -2103,7 +2038,7 @@ impl GoogleDriveRouter {
                 .and_then(|q| q.as_str())
                 .ok_or(ErrorData {
             code: ErrorCode::INVALID_PARAMS,
-            message: Cow::from("The name param is required".to_string(),
+            message: Cow::from("The name param is required".to_string()),
             data: None,
         },
                 ))?;
@@ -2114,7 +2049,7 @@ impl GoogleDriveRouter {
                 .and_then(|q| q.as_str())
                 .ok_or(ErrorData {
             code: ErrorCode::INVALID_PARAMS,
-            message: Cow::from("The mimeType param is required".to_string(),
+            message: Cow::from("The mimeType param is required".to_string()),
             data: None,
         },
                 ))?;
@@ -2136,7 +2071,7 @@ impl GoogleDriveRouter {
                     if body.is_none() {
                         return Err(ErrorData {
             code: ErrorCode::INVALID_PARAMS,
-            message: Cow::from("The body param is required for google document file type".to_string(),
+            message: Cow::from("The body param is required for google document file type".to_string()),
             data: None,
         },
                         ));
@@ -2169,7 +2104,7 @@ impl GoogleDriveRouter {
                     if path.is_none() {
                         return Err(ErrorData {
             code: ErrorCode::INVALID_PARAMS,
-            message: Cow::from("The path param is required for google slides file type".to_string(),
+            message: Cow::from("The path param is required for google slides file type".to_string()),
             data: None,
         },
                         ));
@@ -2178,9 +2113,7 @@ impl GoogleDriveRouter {
                     let file = std::fs::File::open(path.unwrap()).map_err(|e| {
                         ErrorData {
             code: ErrorCode::INTERNAL_ERROR,
-            message: Cow::from(format!("Error opening {}: {}", path.unwrap(),
-            data: None,
-        }, e).to_string(),
+            message: Cow::from(format!("Error opening {}: {}", path.unwrap(), e).to_string()),
                         )
                     })?;
 
@@ -2204,7 +2137,7 @@ impl GoogleDriveRouter {
                     if target_id.is_none() {
                         return Err(ErrorData {
             code: ErrorCode::INVALID_PARAMS,
-            message: Cow::from("The targetId param is required when creating a shortcut".to_string(),
+            message: Cow::from("The targetId param is required when creating a shortcut".to_string()),
             data: None,
         },
                         ));
@@ -2223,7 +2156,7 @@ impl GoogleDriveRouter {
                         (None, None) | (Some(_), Some(_)) => {
                             return Err(ErrorData {
             code: ErrorCode::INVALID_PARAMS,
-            message: Cow::from("Either the body or path param is required".to_string(),
+            message: Cow::from("Either the body or path param is required".to_string()),
             data: None,
         },
                             ))
@@ -2232,9 +2165,7 @@ impl GoogleDriveRouter {
                         (None, Some(p)) => Box::new(std::fs::File::open(p).map_err(|e| {
                             ErrorData {
             code: ErrorCode::INTERNAL_ERROR,
-            message: Cow::from(format!("Error opening {}: {}", p, e),
-            data: None,
-        }.to_string(),
+            message: Cow::from(format!("Error opening {}: {}", p, e).to_string()),
                             )
                         })?),
                     };
@@ -2264,7 +2195,7 @@ impl GoogleDriveRouter {
                 .and_then(|q| q.as_str())
                 .ok_or(ErrorData {
             code: ErrorCode::INVALID_PARAMS,
-            message: Cow::from("The fileId param is required".to_string(),
+            message: Cow::from("The fileId param is required".to_string()),
             data: None,
         },
                 ))?;
@@ -2273,14 +2204,14 @@ impl GoogleDriveRouter {
             .and_then(|q| q.as_str())
             .ok_or(ErrorData {
             code: ErrorCode::INVALID_PARAMS,
-            message: Cow::from("The currentFolderId param is required".to_string(),
+            message: Cow::from("The currentFolderId param is required".to_string()),
             data: None,
         },
             ))?;
         let new_folder_id = params.get("newFolderId").and_then(|q| q.as_str()).ok_or(
             ErrorData {
             code: ErrorCode::INVALID_PARAMS,
-            message: Cow::from("The newFolderId param is required".to_string(),
+            message: Cow::from("The newFolderId param is required".to_string()),
             data: None,
         }),
         )?;
@@ -2300,9 +2231,7 @@ impl GoogleDriveRouter {
         match result {
             Err(e) => Err(ErrorData {
             code: ErrorCode::INTERNAL_ERROR,
-            message: Cow::from(format!(
-                "Failed to move google drive file {}, {}.",
-                file_id, e),
+            message: Cow::from(format!("Failed to move google drive file {}, {}.", file_id, e)),
             data: None,
         })),
             Ok(r) => Ok(vec![Content::text(format!(
@@ -2321,7 +2250,7 @@ impl GoogleDriveRouter {
                 .and_then(|q| q.as_str())
                 .ok_or(ErrorData {
             code: ErrorCode::INVALID_PARAMS,
-            message: Cow::from("The fileId param is required".to_string(),
+            message: Cow::from("The fileId param is required".to_string()),
             data: None,
         },
                 ))?;
@@ -2364,7 +2293,7 @@ impl GoogleDriveRouter {
                 let label_id = op.get("labelId").and_then(|o| o.as_str()).ok_or(
                     ErrorData {
             code: ErrorCode::INVALID_PARAMS,
-            message: Cow::from("The labelId param is required for label changes".to_string(),
+            message: Cow::from("The labelId param is required for label changes".to_string()),
             data: None,
         },
                     ),
@@ -2382,7 +2311,7 @@ impl GoogleDriveRouter {
                         let field_id = op.get("fieldId").and_then(|o| o.as_str()).ok_or(
                             ErrorData {
             code: ErrorCode::INVALID_PARAMS,
-            message: Cow::from("The fieldId param is required for unsetting a field.".to_string(),
+            message: Cow::from("The fieldId param is required for unsetting a field.".to_string()),
             data: None,
         },
                             ),
@@ -2414,9 +2343,7 @@ impl GoogleDriveRouter {
                                     NaiveDate::parse_from_str(d, "%Y-%m-%d").map_err(|e| {
                                         ErrorData {
             code: ErrorCode::INVALID_PARAMS,
-            message: Cow::from(format!(
-                                            "Error parsing field date: {}",
-                                            e),
+            message: Cow::from(format!("Error parsing field date: {}", e)),
             data: None,
         })
                                     })
@@ -2472,9 +2399,7 @@ impl GoogleDriveRouter {
                     _ => {
                         return Err(ErrorData {
             code: ErrorCode::INVALID_PARAMS,
-            message: Cow::from(format!(
-                            "Label operation invalid: {:?}",
-                            op.get("operation"),
+            message: Cow::from(format!("Label operation invalid: {:?}", op.get("operation")),
             data: None,
         }
                         )))
@@ -2488,9 +2413,7 @@ impl GoogleDriveRouter {
         match result {
             Err(e) => Err(ErrorData {
             code: ErrorCode::INTERNAL_ERROR,
-            message: Cow::from(format!(
-                "Failed to update label for google drive file {}, {}.",
-                file_id, e),
+            message: Cow::from(format!("Failed to update label for google drive file {}, {}.", file_id, e)),
             data: None,
         })),
             Ok(r) => Ok(vec![Content::text(format!(
@@ -2516,7 +2439,7 @@ impl GoogleDriveRouter {
                     if body.is_none() {
                         return Err(ErrorData {
             code: ErrorCode::INVALID_PARAMS,
-            message: Cow::from("The body param is required for google document file type".to_string(),
+            message: Cow::from("The body param is required for google document file type".to_string()),
             data: None,
         },
                         ));
@@ -2549,7 +2472,7 @@ impl GoogleDriveRouter {
                     if path.is_none() {
                         return Err(ErrorData {
             code: ErrorCode::INVALID_PARAMS,
-            message: Cow::from("The path param is required for google slides file type".to_string(),
+            message: Cow::from("The path param is required for google slides file type".to_string()),
             data: None,
         },
                         ));
@@ -2558,9 +2481,7 @@ impl GoogleDriveRouter {
                     let file = std::fs::File::open(path.unwrap()).map_err(|e| {
                         ErrorData {
             code: ErrorCode::INTERNAL_ERROR,
-            message: Cow::from(format!("Error opening {}: {}", path.unwrap(),
-            data: None,
-        }, e).to_string(),
+            message: Cow::from(format!("Error opening {}: {}", path.unwrap(), e).to_string()),
                         )
                     })?;
 
@@ -2576,7 +2497,7 @@ impl GoogleDriveRouter {
                         (None, None) | (Some(_), Some(_)) => {
                             return Err(ErrorData {
             code: ErrorCode::INVALID_PARAMS,
-            message: Cow::from("Either the body or path param is required".to_string(),
+            message: Cow::from("Either the body or path param is required".to_string()),
             data: None,
         },
                             ))
@@ -2585,9 +2506,7 @@ impl GoogleDriveRouter {
                         (None, Some(p)) => Box::new(std::fs::File::open(p).map_err(|e| {
                             ErrorData {
             code: ErrorCode::INTERNAL_ERROR,
-            message: Cow::from(format!("Error opening {}: {}", p, e),
-            data: None,
-        }.to_string(),
+            message: Cow::from(format!("Error opening {}: {}", p, e).to_string()),
                             )
                         })?),
                     };
@@ -2616,7 +2535,7 @@ impl GoogleDriveRouter {
                 .and_then(|q| q.as_str())
                 .ok_or(ErrorData {
             code: ErrorCode::INVALID_PARAMS,
-            message: Cow::from("The fileId param is required".to_string(),
+            message: Cow::from("The fileId param is required".to_string()),
             data: None,
         },
                 ))?;
@@ -2641,9 +2560,7 @@ impl GoogleDriveRouter {
                 Err(e) => {
                     return Err(ErrorData {
             code: ErrorCode::INTERNAL_ERROR,
-            message: Cow::from(format!(
-                        "Failed to execute google drive comment list, {}.",
-                        e),
+            message: Cow::from(format!("Failed to execute google drive comment list, {}.", e)),
             data: None,
         }))
                 }
@@ -2687,14 +2604,14 @@ impl GoogleDriveRouter {
                 .and_then(|q| q.as_str())
                 .ok_or(ErrorData {
             code: ErrorCode::INVALID_PARAMS,
-            message: Cow::from("The fileId param is required".to_string(),
+            message: Cow::from("The fileId param is required".to_string()),
             data: None,
         },
                 ))?;
         let operation = params.get("operation").and_then(|q| q.as_str()).ok_or(
             ErrorData {
             code: ErrorCode::INVALID_PARAMS,
-            message: Cow::from("The operation is required".to_string(),
+            message: Cow::from("The operation is required".to_string()),
             data: None,
         }),
         )?;
@@ -2704,7 +2621,7 @@ impl GoogleDriveRouter {
                 .and_then(|q| q.as_str())
                 .ok_or(ErrorData {
             code: ErrorCode::INVALID_PARAMS,
-            message: Cow::from("The content param is required if the action is create".to_string(),
+            message: Cow::from("The content param is required if the action is create".to_string()),
             data: None,
         },
                 ))?;
@@ -2728,9 +2645,7 @@ impl GoogleDriveRouter {
                 match result {
                     Err(e) => Err(ErrorData {
             code: ErrorCode::INTERNAL_ERROR,
-            message: Cow::from(format!(
-                        "Failed to add comment for google drive file {}, {}.",
-                        file_id, e),
+            message: Cow::from(format!("Failed to add comment for google drive file {}, {}.", file_id, e)),
             data: None,
         })),
                     Ok(r) => Ok(vec![Content::text(format!(
@@ -2747,7 +2662,7 @@ impl GoogleDriveRouter {
                 let comment_id = params.get("commentId").and_then(|q| q.as_str()).ok_or(
                     ErrorData {
             code: ErrorCode::INVALID_PARAMS,
-            message: Cow::from("The commentId param is required for reply".to_string(),
+            message: Cow::from("The commentId param is required for reply".to_string()),
             data: None,
         },
                     ),
@@ -2778,9 +2693,7 @@ impl GoogleDriveRouter {
                 match result {
                     Err(e) => Err(ErrorData {
             code: ErrorCode::INTERNAL_ERROR,
-            message: Cow::from(format!(
-                        "Failed to manage reply to comment {} for google drive file {}, {}.",
-                        comment_id, file_id, e),
+            message: Cow::from(format!("Failed to manage reply to comment {} for google drive file {}, {}.", comment_id, file_id, e)),
             data: None,
         })),
                     Ok(r) => Ok(vec![Content::text(format!(
@@ -2795,9 +2708,7 @@ impl GoogleDriveRouter {
             }
             _ => Err(ErrorData {
             code: ErrorCode::INVALID_PARAMS,
-            message: Cow::from(format!(
-                "Invalid operation: {}. Supported operations are: create, reply",
-                operation),
+            message: Cow::from(format!("Invalid operation: {}. Supported operations are: create, reply", operation)),
             data: None,
         })),
         }
@@ -2807,7 +2718,7 @@ impl GoogleDriveRouter {
         let document_id = params.get("documentId").and_then(|q| q.as_str()).ok_or(
             ErrorData {
             code: ErrorCode::INVALID_PARAMS,
-            message: Cow::from("The documentId is required".to_string(),
+            message: Cow::from("The documentId is required".to_string()),
             data: None,
         }),
         )?;
@@ -2815,7 +2726,7 @@ impl GoogleDriveRouter {
         let operation = params.get("operation").and_then(|q| q.as_str()).ok_or(
             ErrorData {
             code: ErrorCode::INVALID_PARAMS,
-            message: Cow::from("The operation is required".to_string(),
+            message: Cow::from("The operation is required".to_string()),
             data: None,
         }),
         )?;
@@ -2835,9 +2746,7 @@ impl GoogleDriveRouter {
                 match result {
                     Err(e) => Err(ErrorData {
             code: ErrorCode::INTERNAL_ERROR,
-            message: Cow::from(format!(
-                        "Failed to execute Google Docs get query, {}.",
-                        e),
+            message: Cow::from(format!("Failed to execute Google Docs get query, {}.", e)),
             data: None,
         })),
                     Ok(r) => {
@@ -2874,7 +2783,7 @@ impl GoogleDriveRouter {
                 let text = params.get("text").and_then(|q| q.as_str()).ok_or(
                     ErrorData {
             code: ErrorCode::INVALID_PARAMS,
-            message: Cow::from("The text parameter is required for insert_text operation".to_string(),
+            message: Cow::from("The text parameter is required for insert_text operation".to_string()),
             data: None,
         }),
                 )?;
@@ -2882,7 +2791,7 @@ impl GoogleDriveRouter {
                 let position = params.get("position").and_then(|q| q.as_i64()).ok_or(
                     ErrorData {
             code: ErrorCode::INVALID_PARAMS,
-            message: Cow::from("The position parameter is required for insert_text operation".to_string(),
+            message: Cow::from("The position parameter is required for insert_text operation".to_string()),
             data: None,
         }),
                 )?;
@@ -2919,9 +2828,7 @@ impl GoogleDriveRouter {
                 match result {
                     Err(e) => Err(ErrorData {
             code: ErrorCode::INTERNAL_ERROR,
-            message: Cow::from(format!(
-                        "Failed to execute Google Docs insert_text operation, {}.",
-                        e),
+            message: Cow::from(format!("Failed to execute Google Docs insert_text operation, {}.", e)),
             data: None,
         })),
                     Ok(_) => {
@@ -2936,7 +2843,7 @@ impl GoogleDriveRouter {
                 let text = params.get("text").and_then(|q| q.as_str()).ok_or(
                     ErrorData {
             code: ErrorCode::INVALID_PARAMS,
-            message: Cow::from("The text parameter is required for append_text operation".to_string(),
+            message: Cow::from("The text parameter is required for append_text operation".to_string()),
             data: None,
         }),
                 )?;
@@ -2955,9 +2862,7 @@ impl GoogleDriveRouter {
                     Err(e) => {
                         return Err(ErrorData {
             code: ErrorCode::INTERNAL_ERROR,
-            message: Cow::from(format!(
-                            "Failed to get document to determine end position, {}.",
-                            e),
+            message: Cow::from(format!("Failed to get document to determine end position, {}.", e)),
             data: None,
         }));
                     },
@@ -3007,9 +2912,7 @@ impl GoogleDriveRouter {
                 match result {
                     Err(e) => Err(ErrorData {
             code: ErrorCode::INTERNAL_ERROR,
-            message: Cow::from(format!(
-                        "Failed to execute Google Docs append_text operation, {}.",
-                        e),
+            message: Cow::from(format!("Failed to execute Google Docs append_text operation, {}.", e)),
             data: None,
         })),
                     Ok(_) => {
@@ -3021,7 +2924,7 @@ impl GoogleDriveRouter {
                 let text = params.get("text").and_then(|q| q.as_str()).ok_or(
                     ErrorData {
             code: ErrorCode::INVALID_PARAMS,
-            message: Cow::from("The text parameter is required for replace_text operation".to_string(),
+            message: Cow::from("The text parameter is required for replace_text operation".to_string()),
             data: None,
         }),
                 )?;
@@ -3029,7 +2932,7 @@ impl GoogleDriveRouter {
                 let replace_text = params.get("replaceText").and_then(|q| q.as_str()).ok_or(
                     ErrorData {
             code: ErrorCode::INVALID_PARAMS,
-            message: Cow::from("The replaceText parameter is required for replace_text operation".to_string(),
+            message: Cow::from("The replaceText parameter is required for replace_text operation".to_string()),
             data: None,
         }),
                 )?;
@@ -3065,9 +2968,7 @@ impl GoogleDriveRouter {
                 match result {
                     Err(e) => Err(ErrorData {
             code: ErrorCode::INTERNAL_ERROR,
-            message: Cow::from(format!(
-                        "Failed to execute Google Docs replace_text operation, {}.",
-                        e),
+            message: Cow::from(format!("Failed to execute Google Docs replace_text operation, {}.", e)),
             data: None,
         })),
                     Ok(r) => {
@@ -3094,7 +2995,7 @@ impl GoogleDriveRouter {
                 let text = params.get("text").and_then(|q| q.as_str()).ok_or(
                     ErrorData {
             code: ErrorCode::INVALID_PARAMS,
-            message: Cow::from("The text parameter is required for create_paragraph operation".to_string(),
+            message: Cow::from("The text parameter is required for create_paragraph operation".to_string()),
             data: None,
         }),
                 )?;
@@ -3113,9 +3014,7 @@ impl GoogleDriveRouter {
                     Err(e) => {
                         return Err(ErrorData {
             code: ErrorCode::INTERNAL_ERROR,
-            message: Cow::from(format!(
-                            "Failed to get document to determine end position, {}.",
-                            e),
+            message: Cow::from(format!("Failed to get document to determine end position, {}.", e)),
             data: None,
         }));
                     },
@@ -3165,9 +3064,7 @@ impl GoogleDriveRouter {
                 match result {
                     Err(e) => Err(ErrorData {
             code: ErrorCode::INTERNAL_ERROR,
-            message: Cow::from(format!(
-                        "Failed to execute Google Docs create_paragraph operation, {}.",
-                        e),
+            message: Cow::from(format!("Failed to execute Google Docs create_paragraph operation, {}.", e)),
             data: None,
         })),
                     Ok(_) => {
@@ -3179,7 +3076,7 @@ impl GoogleDriveRouter {
                 let start_position = params.get("startPosition").and_then(|q| q.as_i64()).ok_or(
                     ErrorData {
             code: ErrorCode::INVALID_PARAMS,
-            message: Cow::from("The startPosition parameter is required for delete_content operation".to_string(),
+            message: Cow::from("The startPosition parameter is required for delete_content operation".to_string()),
             data: None,
         }),
                 )?;
@@ -3187,7 +3084,7 @@ impl GoogleDriveRouter {
                 let end_position = params.get("endPosition").and_then(|q| q.as_i64()).ok_or(
                     ErrorData {
             code: ErrorCode::INVALID_PARAMS,
-            message: Cow::from("The endPosition parameter is required for delete_content operation".to_string(),
+            message: Cow::from("The endPosition parameter is required for delete_content operation".to_string()),
             data: None,
         }),
                 )?;
@@ -3223,9 +3120,7 @@ impl GoogleDriveRouter {
                 match result {
                     Err(e) => Err(ErrorData {
             code: ErrorCode::INTERNAL_ERROR,
-            message: Cow::from(format!(
-                        "Failed to execute Google Docs delete_content operation, {}.",
-                        e),
+            message: Cow::from(format!("Failed to execute Google Docs delete_content operation, {}.", e)),
             data: None,
         })),
                     Ok(_) => {
@@ -3238,9 +3133,7 @@ impl GoogleDriveRouter {
             },
             _ => Err(ErrorData {
             code: ErrorCode::INVALID_PARAMS,
-            message: Cow::from(format!(
-                "Invalid operation: {}. Supported operations are: get_document, insert_text, append_text, replace_text, create_paragraph, delete_content",
-                operation),
+            message: Cow::from(format!("Invalid operation: {}. Supported operations are: get_document, insert_text, append_text, replace_text, create_paragraph, delete_content", operation)),
             data: None,
         })),
         }
@@ -3271,9 +3164,7 @@ impl GoogleDriveRouter {
                 Err(e) => {
                     return Err(ErrorData {
             code: ErrorCode::INTERNAL_ERROR,
-            message: Cow::from(format!(
-                        "Failed to execute google drive list, {}.",
-                        e),
+            message: Cow::from(format!("Failed to execute google drive list, {}.", e)),
             data: None,
         }))
                 }
@@ -3324,7 +3215,7 @@ impl GoogleDriveRouter {
                 .and_then(|q| q.as_str())
                 .ok_or(ErrorData {
             code: ErrorCode::INVALID_PARAMS,
-            message: Cow::from("The fileId param is required".to_string(),
+            message: Cow::from("The fileId param is required".to_string()),
             data: None,
         },
                 ))?;
@@ -3350,9 +3241,7 @@ impl GoogleDriveRouter {
                 Err(e) => {
                     return Err(ErrorData {
             code: ErrorCode::INTERNAL_ERROR,
-            message: Cow::from(format!(
-                        "Failed to execute google drive list, {}.",
-                        e),
+            message: Cow::from(format!("Failed to execute google drive list, {}.", e)),
             data: None,
         }))
                 }
@@ -3381,14 +3270,14 @@ impl GoogleDriveRouter {
                 .and_then(|q| q.as_str())
                 .ok_or(ErrorData {
             code: ErrorCode::INVALID_PARAMS,
-            message: Cow::from("The fileId param is required".to_string(),
+            message: Cow::from("The fileId param is required".to_string()),
             data: None,
         },
                 ))?;
         let operation = params.get("operation").and_then(|q| q.as_str()).ok_or(
             ErrorData {
             code: ErrorCode::INVALID_PARAMS,
-            message: Cow::from("The operation is required".to_string(),
+            message: Cow::from("The operation is required".to_string()),
             data: None,
         }),
         )?;
@@ -3450,9 +3339,7 @@ impl GoogleDriveRouter {
                     (_, _) => {
                         return Err(ErrorData {
             code: ErrorCode::INVALID_PARAMS,
-            message: Cow::from(format!(
-                            "The '{}' operation for type '{}' requires the 'target' parameter.",
-                            operation, permission_type),
+            message: Cow::from(format!("The '{}' operation for type '{}' requires the 'target' parameter.", operation, permission_type)),
             data: None,
         }))
                     }
@@ -3473,9 +3360,7 @@ impl GoogleDriveRouter {
                 match result {
                     Err(e) => Err(ErrorData {
             code: ErrorCode::INTERNAL_ERROR,
-            message: Cow::from(format!(
-                        "Failed to manage sharing for google drive file {}, {}.",
-                        file_id, e),
+            message: Cow::from(format!("Failed to manage sharing for google drive file {}, {}.", file_id, e)),
             data: None,
         })),
                     Ok(r) => Ok(vec![Content::text(self.output_permission(r.1))]),
@@ -3516,9 +3401,7 @@ impl GoogleDriveRouter {
                 match result {
                     Err(e) => Err(ErrorData {
             code: ErrorCode::INTERNAL_ERROR,
-            message: Cow::from(format!(
-                        "Failed to manage sharing for google drive file {}, {}.",
-                        file_id, e),
+            message: Cow::from(format!("Failed to manage sharing for google drive file {}, {}.", file_id, e)),
             data: None,
         })),
                     Ok(r) => Ok(vec![Content::text(self.output_permission(r.1))]),
@@ -3527,7 +3410,7 @@ impl GoogleDriveRouter {
             "delete" => {
                 let permission_id = permission_id.ok_or(ErrorData {
             code: ErrorCode::INVALID_PARAMS,
-            message: Cow::from("The 'delete' operation requires the 'permissionId'.".to_string(),
+            message: Cow::from("The 'delete' operation requires the 'permissionId'.".to_string()),
             data: None,
         },
                 ))?;
@@ -3544,9 +3427,7 @@ impl GoogleDriveRouter {
                 match result {
                     Err(e) => Err(ErrorData {
             code: ErrorCode::INTERNAL_ERROR,
-            message: Cow::from(format!(
-                        "Failed to manage sharing for google drive file {}, {}.",
-                        file_id, e),
+            message: Cow::from(format!("Failed to manage sharing for google drive file {}, {}.", file_id, e)),
             data: None,
         })),
                     Ok(_) => Ok(vec![Content::text(format!(
@@ -3557,12 +3438,7 @@ impl GoogleDriveRouter {
             }
             s => Err(ErrorData {
             code: ErrorCode::INVALID_PARAMS,
-            message: Cow::from(format!(
-                    "Parameter 'operation' must be one of ('create', 'update', 'delete'),
-            data: None,
-        }; given {}",
-                    s
-                )
+            message: Cow::from(format!("Parameter \'operation\' must be one of (\'create\', \'update\', \'delete\'), given {}", s)
                 .to_string(),
             )),
         }
@@ -3579,9 +3455,7 @@ impl GoogleDriveRouter {
         match result {
             Err(e) => Err(ErrorData {
             code: ErrorCode::INTERNAL_ERROR,
-            message: Cow::from(format!(
-                "Failed to list labels for Google Drive {}",
-                e),
+            message: Cow::from(format!("Failed to list labels for Google Drive {}", e)),
             data: None,
         })),
             Ok(r) => {
@@ -3653,7 +3527,7 @@ impl Router for GoogleDriveRouter {
                 "sharing" => this.sharing(arguments).await,
                 _ => Err(ErrorData {
             code: ErrorCode::INVALID_REQUEST,
-            message: Cow::from(format!("Tool {} not found", tool_name),
+            message: Cow::from(format!("Tool {} not found", tool_name)),
             data: None,
         })),
             }
