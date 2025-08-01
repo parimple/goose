@@ -134,6 +134,30 @@ impl SessionMetadata {
             accumulated_output_tokens: None,
         }
     }
+
+    /// Get the best available total token count for compaction decisions
+    /// Uses current context tokens, not accumulated session totals
+    pub fn get_compaction_token_count(&self) -> Option<i32> {
+        self.total_tokens
+    }
+
+    /// Get the best available input token count for cost display
+    /// Uses accumulated tokens for total session cost tracking
+    pub fn get_display_input_tokens(&self) -> Option<i32> {
+        self.accumulated_input_tokens.or(self.input_tokens)
+    }
+
+    /// Get the best available output token count for cost display  
+    /// Uses accumulated tokens for total session cost tracking
+    pub fn get_display_output_tokens(&self) -> Option<i32> {
+        self.accumulated_output_tokens.or(self.output_tokens)
+    }
+
+    /// Get the best available total token count for context display
+    /// Uses current context tokens, not accumulated session totals
+    pub fn get_display_total_tokens(&self) -> Option<i32> {
+        self.total_tokens
+    }
 }
 
 impl Default for SessionMetadata {

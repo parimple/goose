@@ -1426,13 +1426,13 @@ impl Session {
 
         match self.get_metadata() {
             Ok(metadata) => {
-                let total_tokens = metadata.total_tokens.unwrap_or(0) as usize;
+                let total_tokens = metadata.get_display_total_tokens().unwrap_or(0) as usize;
 
                 output::display_context_usage(total_tokens, context_limit);
 
                 if show_cost {
-                    let input_tokens = metadata.input_tokens.unwrap_or(0) as usize;
-                    let output_tokens = metadata.output_tokens.unwrap_or(0) as usize;
+                    let input_tokens = metadata.get_display_input_tokens().unwrap_or(0) as usize;
+                    let output_tokens = metadata.get_display_output_tokens().unwrap_or(0) as usize;
                     output::display_cost_usage(
                         &provider_name,
                         &model_config.model_name,
