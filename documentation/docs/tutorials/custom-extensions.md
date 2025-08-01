@@ -51,10 +51,6 @@ Your project directory structure should look like this:
 └── uv.lock
 ```
 
-:::info
-The `--lib` flag automatically creates the `__init__.py` and `py.typed` files.
-:::
-
 ---
 
 ## Step 2: Write Your MCP Server Code
