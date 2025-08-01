@@ -40,7 +40,7 @@ jobs:
       id-token: write
       contents: read
     outputs:
-        artifact-url: ${{ steps.output-app-bundle.artifact-url }}
+        artifact-url: ${{ steps.upload-app-bundle.outputs.artifact-url }}
     steps:
       # Debug information about the workflow and inputs
       - name: Debug workflow info
