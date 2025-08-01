@@ -501,7 +501,7 @@ fn print_markdown(content: &str, theme: Theme) {
             .print()
             .unwrap();
     } else {
-        println!("{}", content);
+        print!("{}", content);
     }
 }
 
