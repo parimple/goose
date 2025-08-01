@@ -4,23 +4,10 @@ on:
   pull_request:
     branches:
       - 'release/v[0-9].[0-9]+.[0-9]+'
-  workflow_dispatch:
-    inputs:
-      pr_number:
-        description: 'PR number to comment on'
-        required: true
-        type: string
-      ref:
-        description: 'The ref to build'
-        required: true
-        type: string
 
 jobs:
   bundle-desktop:
     uses: ./.github/workflows/bundle-desktop.yml
-    with:
-      signing: true
-      ref: ${{ github.event.inputs && github.event.inputs.ref || '' }}
 
   comment-on-pr:
     needs: bundle-desktop
@@ -32,7 +19,7 @@ jobs:
       - name: Comment with download link
         uses: peter-evans/create-or-update-comment@71345be0265236311c031f5c7866368bd1eff043 # pin@v4
         with:
-          issue-number: ${{ github.event.number || github.event.inputs.pr_number }}
+          issue-number: ${{ github.event.number }}
           body: |
             ### macOS ARM64 Desktop App (Apple Silicon)
 
