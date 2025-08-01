@@ -1,0 +1,31 @@
+name: Release Branches
+
+on:
+  pull_request:
+    branches:
+      - 'release/v[0-9].[0-9]+.[0-9]+'
+
+jobs:
+  bundle-desktop:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - name: Create macOS app bundle
+        id: create-bundle
+        uses: ./.github/workflows/bundle-desktop.yml
+        with:
+          signing: false
+
+      - name: Comment with download link
+        uses: peter-evans/create-or-update-comment@71345be0265236311c031f5c7866368bd1eff043 # pin@v4
+        with:
+          issue-number: ${{ github.event.number }}
+          body: |
+            ### macOS ARM64 Desktop App (Apple Silicon)
+
+            [📱 Download macOS Desktop App (arm64, signed)](${{ steps.create-bundle.outputs.artifact-url }})
+
+            **Instructions:**
+            After downloading, unzip the file and drag the Goose.app to your Applications folder. The app is signed and notarized for macOS.
