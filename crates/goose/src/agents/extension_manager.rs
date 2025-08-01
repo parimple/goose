@@ -1,6 +1,6 @@
 use anyhow::Result;
 use axum::http::{HeaderMap, HeaderName};
-use chrono::{DateTime, TimeZone, Utc};
+use chrono::{DateTime, Utc};
 use futures::stream::{FuturesUnordered, StreamExt};
 use futures::{future, FutureExt};
 use mcp_core::{ToolCall, ToolError};
@@ -12,7 +12,6 @@ use rmcp::transport::{
 use std::collections::{HashMap, HashSet};
 use std::process::Stdio;
 use std::sync::Arc;
-use std::sync::LazyLock;
 use std::time::Duration;
 use tempfile::tempdir;
 use tokio::io::AsyncReadExt;
@@ -29,14 +28,11 @@ use crate::agents::extension::{Envs, ProcessExit};
 use crate::config::{Config, ExtensionConfigManager};
 use crate::prompt_template;
 use mcp_client::client::{McpClient, McpClientTrait};
-use rmcp::model::{Content, GetPromptResult, Prompt, Resource, ResourceContents, Tool};
+use rmcp::model::{Content, GetPromptResult, Prompt, ResourceContents, Tool};
 use serde_json::Value;
 
 // By default, we set it to Jan 1, 2020 if the resource does not have a timestamp
 // This is to ensure that the resource is considered less important than resources with a more recent timestamp
-static DEFAULT_TIMESTAMP: LazyLock<DateTime<Utc>> =
-    LazyLock::new(|| Utc.with_ymd_and_hms(2020, 1, 1, 0, 0, 0).unwrap());
-
 type McpClientBox = Arc<Mutex<Box<dyn McpClientTrait>>>;
 
 /// Manages Goose extensions / MCP clients and their interactions
@@ -871,10 +867,6 @@ impl ExtensionManager {
 
         Ok(vec![Content::text(output_parts.join("\n"))])
     }
-}
-
-fn resource_is_active(resource: &Resource) -> bool {
-    resource.priority().is_some_and(|p| (p - 1.0).abs() < 1e-6)
 }
 
 #[cfg(test)]
