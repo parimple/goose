@@ -28,15 +28,12 @@ The first step is to create a new project using [uv][uv-docs]. We will name our 
 Run the following commands in your terminal to set up a basic structure for your MCP server:
 
 ```bash
-uv init mcp-wiki
-
+uv init --lib mcp-wiki
 cd mcp-wiki
-rm hello.py
 
 mkdir -p src/mcp_wiki
-touch src/mcp_wiki/server.py  # Your MCP server code (tool, resources, prompts)
-touch src/mcp_wiki/__init__.py  # Primary CLI entry point
-touch src/mcp_wiki/__main__.py # To enable running as a Python module
+touch src/mcp_wiki/server.py
+touch src/mcp_wiki/__main__.py
 ```
 
 Your project directory structure should look like this:
@@ -47,11 +44,16 @@ Your project directory structure should look like this:
 ├── pyproject.toml
 ├── src
 │   └── mcp_wiki
-│       ├── __init__.py
-│       ├── __main__.py
-│       └── server.py
+│       ├── __init__.py   # Primary CLI entry point
+│       ├── __main__.py   # To enable running as a Python module
+│       ├── py.typed      # Indicates the package supports type hints
+│       └── server.py     # Your MCP server code (tool, resources, prompts)
 └── uv.lock
 ```
+
+:::info
+The `--lib` flag automatically creates the `__init__.py` and `py.typed` files.
+:::
 
 ---
 
