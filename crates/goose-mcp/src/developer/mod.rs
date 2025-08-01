@@ -1011,7 +1011,6 @@ impl DeveloperRouter {
             let lines: Vec<&str> = content.lines().collect();
             let total_lines = lines.len();
 
-            // Check if file has more than 2000 lines and no view_range is provided
             if view_range.is_none() && total_lines > 2000 {
                 return Err(ToolError::ExecutionError(format!(
                     "File '{}' is {} lines long, recommended to read in with view_range (or searching) to get bite size content. If you do wish to read all the file, please pass in view_range with [1, {}] to read it all at once",
