@@ -944,8 +944,42 @@ const buildRecentFilesMenu = () => {
 const openDirectoryDialog = async (
   replaceWindow: boolean = false
 ): Promise<OpenDialogReturnValue> => {
+  // Get the current working directory from the focused window
+  let defaultPath: string | undefined;
+  const currentWindow = BrowserWindow.getFocusedWindow();
+
+  if (currentWindow) {
+    try {
+      const currentWorkingDir = await currentWindow.webContents.executeJavaScript(
+        `window.appConfig ? window.appConfig.get('GOOSE_WORKING_DIR') : null`
+      );
+
+      if (currentWorkingDir && typeof currentWorkingDir === 'string') {
+        // Verify the directory exists before using it as default
+        try {
+          const stats = fsSync.lstatSync(currentWorkingDir);
+          if (stats.isDirectory()) {
+            defaultPath = currentWorkingDir;
+          }
+        } catch (error) {
+          console.warn(
+            `Current working directory doesn't exist: ${currentWorkingDir}, falling back to home directory`
+          );
+          defaultPath = os.homedir();
+        }
+      }
+    } catch (error) {
+      console.warn('Failed to get current working directory from window:', error);
+    }
+  }
+
+  if (!defaultPath) {
+    defaultPath = os.homedir();
+  }
+
   const result = (await dialog.showOpenDialog({
     properties: ['openFile', 'openDirectory', 'createDirectory'],
+    defaultPath: defaultPath,
   })) as unknown as OpenDialogReturnValue;
 
   if (!result.canceled && result.filePaths.length > 0) {
