@@ -3,6 +3,8 @@ title: Building Custom Extensions
 description: Create your own custom MCP Server to use as a Goose extension
 ---
 
+import { PanelLeft } from 'lucide-react';
+
 # Building Custom Extensions with Goose
 
 
@@ -245,23 +247,25 @@ build-backend = "hatchling.build"
 
 To add your MCP server as an extension in Goose:
 
-1. Go to `Settings > Extensions > Add`.
-2. Set the `Type` to `StandardIO`.
-3. Provide the ID, name, and description for your extension.
-4. In the `Command` field, provide the absolute path to your executable. For example:
+1. Click the <PanelLeft className="inline" size={16} /> button in the top-left to open the sidebar
+2. Click `Extensions` in the sidebar
+3. Set the `Type` to `STDIO`
+4. Provide a name and description for your extension
+5. In the `Command` field, provide the absolute path to your executable:
    ```plaintext
    uv run /full/path/to/mcp-wiki/.venv/bin/mcp-wiki
    ```
 
-Alternatively in Step 3, you can also publish your package to pypi. Once published, the server can be run directly using uvx. For example:
+   For example:
+   ```plaintext
+   uv run /Users/smohammed/Development/mcp/mcp-wiki/.venv/bin/mcp-wiki
+   ```
+
+For the purposes on this guide, we'll run the local version. Alternatively, you can publish your package to PyPI. Once published, the server can be run directly using `uvx`. For example:
 
 ```
 uvx mcp-wiki
 ```
-
-For the purposes on this guide, we will show you how to run the local version. 
-
-![Goose Settings for Adding Custom Extension](../assets/guides/custom-extension-settings.png)
 
 ---
 
