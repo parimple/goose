@@ -9,7 +9,7 @@ use crate::{
     token_counter::create_async_token_counter,
 };
 use anyhow::Result;
-use tracing::{debug, info, warn};
+use tracing::{debug, info};
 
 /// Result of auto-compaction check
 #[derive(Debug)]
@@ -108,7 +108,7 @@ pub async fn check_compaction_needed(
         usage_ratio > threshold
     };
 
-    warn!(
+    debug!(
         "Compaction check: {} / {} tokens ({:.1}%), threshold: {:.1}%, needs compaction: {}, source: {}",
         current_tokens,
         context_limit,
@@ -471,21 +471,6 @@ mod tests {
                 i
             )));
         }
-
-        // Debug: Check token counts before calling the function
-        let provider = agent.provider().await.unwrap();
-        let token_counter = create_async_token_counter().await.unwrap();
-        let token_counts = get_messages_token_counts_async(&token_counter, &messages);
-        let total_tokens: usize = token_counts.iter().sum();
-        let context_limit = provider.get_model_config().context_limit();
-        let usage_ratio = total_tokens as f64 / context_limit as f64;
-
-        eprintln!(
-            "Debug: tokens: {} / {} ({:.1}%), threshold: 30%",
-            total_tokens,
-            context_limit,
-            usage_ratio * 100.0
-        );
 
         let result = check_and_compact_messages(&agent, &messages, Some(0.3), None)
             .await
