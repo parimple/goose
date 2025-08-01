@@ -1,7 +1,7 @@
 use crate::{
     agents::Agent,
     config::Config,
-    context_mgmt::{estimate_target_context_limit, get_messages_token_counts_async},
+    context_mgmt::get_messages_token_counts_async,
     message::Message,
     token_counter::create_async_token_counter,
 };
@@ -69,7 +69,7 @@ pub async fn check_compaction_needed(
 
     // Get provider
     let provider = agent.provider().await?;
-    let context_limit = estimate_target_context_limit(provider);
+    let context_limit = provider.get_model_config().context_limit();
 
     // Try to use actual token counts from session metadata first
     let (current_tokens, token_source) = match session_metadata.and_then(|m| m.get_compaction_token_count()) {
@@ -525,7 +525,7 @@ mod tests {
             let token_counter = create_async_token_counter().await.unwrap();
             let token_counts = get_messages_token_counts_async(&token_counter, &messages);
             let total_tokens: usize = token_counts.iter().sum();
-            let context_limit = estimate_target_context_limit(provider);
+            let context_limit = provider.get_model_config().context_limit();
             let usage_ratio = total_tokens as f64 / context_limit as f64;
 
             eprintln!(
