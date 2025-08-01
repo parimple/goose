@@ -2,6 +2,8 @@ name: Build Goose Release Candidate
 
 on:
   pull_request:
+    branches:
+      - 'release/v[0-9].[0-9]+.[0-9]+'
   workflow_dispatch:
     inputs:
       pr_number:
