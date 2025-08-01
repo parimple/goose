@@ -75,18 +75,17 @@ pub async fn check_compaction_needed(
     let context_limit = provider.get_model_config().context_limit();
 
     // Try to use actual token counts from session metadata first
-    let (current_tokens, token_source) =
-        match session_metadata.and_then(|m| m.total_tokens) {
-            Some(tokens) => (tokens as usize, "session metadata"),
-            None => {
-                // Fall back to estimated counts
-                let token_counter = create_async_token_counter()
-                    .await
-                    .map_err(|e| anyhow::anyhow!("Failed to create token counter: {}", e))?;
-                let token_counts = get_messages_token_counts_async(&token_counter, messages);
-                (token_counts.iter().sum(), "estimated")
-            }
-        };
+    let (current_tokens, token_source) = match session_metadata.and_then(|m| m.total_tokens) {
+        Some(tokens) => (tokens as usize, "session metadata"),
+        None => {
+            // Fall back to estimated counts
+            let token_counter = create_async_token_counter()
+                .await
+                .map_err(|e| anyhow::anyhow!("Failed to create token counter: {}", e))?;
+            let token_counts = get_messages_token_counts_async(&token_counter, messages);
+            (token_counts.iter().sum(), "estimated")
+        }
+    };
 
     // Calculate usage ratio
     let usage_ratio = current_tokens as f64 / context_limit as f64;
@@ -444,31 +443,57 @@ mod tests {
         let mock_provider = Arc::new(MockProvider {
             model_config: ModelConfig::new("test-model")
                 .unwrap()
-                .with_context_limit(50_000.into()), // Realistic context limit that won't underflow
+                .with_context_limit(30_000.into()), // Smaller context limit to make threshold easier to hit
         });
 
         let agent = Agent::new();
         let _ = agent.update_provider(mock_provider).await;
 
         // Create messages that will exceed 30% of the context limit
-        // With 50k context limit, after overhead we have ~27k usable tokens
-        // 30% of that is ~8.1k tokens, so we need messages that exceed that
+        // With 30k context limit, 30% is 9k tokens
         let mut messages = Vec::new();
 
-        // Create longer messages with more content to reach the threshold
-        for i in 0..200 {
+        // Create much longer messages with more content to reach the threshold
+        for i in 0..300 {
             messages.push(create_test_message(&format!(
-                "This is message number {} with significantly more content to increase token count. \
+                "This is message number {} with significantly more content to increase token count substantially. \
                  We need to ensure that our total token usage exceeds 30% of the available context \
                  limit after accounting for system prompt and tools overhead. This message contains \
-                 multiple sentences to increase the token count substantially.",
+                 multiple sentences to increase the token count substantially. Adding even more text here \
+                 to make sure we have enough tokens. Lorem ipsum dolor sit amet, consectetur adipiscing elit, \
+                 sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, \
+                 quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute \
+                 irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. \
+                 Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit \
+                 anim id est laborum. Sed ut perspiciatis unde omnis iste natus error sit voluptatem accusantium \
+                 doloremque laudantium, totam rem aperiam, eaque ipsa quae ab illo inventore veritatis et quasi \
+                 architecto beatae vitae dicta sunt explicabo.",
                 i
             )));
         }
 
+        // Debug: Check token counts before calling the function
+        let provider = agent.provider().await.unwrap();
+        let token_counter = create_async_token_counter().await.unwrap();
+        let token_counts = get_messages_token_counts_async(&token_counter, &messages);
+        let total_tokens: usize = token_counts.iter().sum();
+        let context_limit = provider.get_model_config().context_limit();
+        let usage_ratio = total_tokens as f64 / context_limit as f64;
+
+        eprintln!(
+            "Debug: tokens: {} / {} ({:.1}%), threshold: 30%",
+            total_tokens,
+            context_limit,
+            usage_ratio * 100.0
+        );
+
         let result = check_and_compact_messages(&agent, &messages, Some(0.3), None)
             .await
             .unwrap();
+
+        if !result.compacted {
+            eprintln!("Test failed - compaction not triggered");
+        }
 
         assert!(result.compacted);
         assert!(result.tokens_before.is_some());
