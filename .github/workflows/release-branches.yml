@@ -3,6 +3,11 @@ name: Build Goose Release Candidate
 on:
   pull_request:
 
+# permissions needed for reacting to IssueOps commands on PRs
+permissions:
+  pull-requests: write
+  checks: read
+
 jobs:
   bundle-desktop:
     uses: ./.github/workflows/bundle-desktop.yml
