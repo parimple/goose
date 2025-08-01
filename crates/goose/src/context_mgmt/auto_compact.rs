@@ -76,7 +76,7 @@ pub async fn check_compaction_needed(
 
     // Try to use actual token counts from session metadata first
     let (current_tokens, token_source) =
-        match session_metadata.and_then(|m| m.get_compaction_token_count()) {
+        match session_metadata.and_then(|m| m.total_tokens) {
             Some(tokens) => (tokens as usize, "session metadata"),
             None => {
                 // Fall back to estimated counts
