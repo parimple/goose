@@ -1,12 +1,15 @@
 use crate::{
     agents::Agent,
     config::Config,
-    context_mgmt::get_messages_token_counts_async,
+    context_mgmt::{
+        common::{SYSTEM_PROMPT_TOKEN_OVERHEAD, TOOLS_TOKEN_OVERHEAD},
+        get_messages_token_counts_async,
+    },
     message::Message,
     token_counter::create_async_token_counter,
 };
 use anyhow::Result;
-use tracing::{debug, info};
+use tracing::{debug, info, warn};
 
 /// Result of auto-compaction check
 #[derive(Debug)]
@@ -105,7 +108,7 @@ pub async fn check_compaction_needed(
         usage_ratio > threshold
     };
 
-    info!(
+    warn!(
         "Compaction check: {} / {} tokens ({:.1}%), threshold: {:.1}%, needs compaction: {}, source: {}",
         current_tokens,
         context_limit,
@@ -236,7 +239,7 @@ pub async fn check_and_compact_messages(
         compacted: true,
         messages: compacted_messages,
         tokens_before: Some(tokens_before),
-        tokens_after: Some(tokens_after),
+        tokens_after: Some(tokens_after + SYSTEM_PROMPT_TOKEN_OVERHEAD + TOOLS_TOKEN_OVERHEAD),
     })
 }
 
