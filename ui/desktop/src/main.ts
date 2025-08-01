@@ -962,10 +962,28 @@ const openDirectoryDialog = async (
             defaultPath = currentWorkingDir;
           }
         } catch (error) {
-          console.warn(
-            `Current working directory doesn't exist: ${currentWorkingDir}, falling back to home directory`
-          );
-          defaultPath = os.homedir();
+          if (error && typeof error === 'object' && 'code' in error) {
+            const fsError = error as { code?: string; message?: string };
+            if (
+              fsError.code === 'ENOENT' ||
+              fsError.code === 'EACCES' ||
+              fsError.code === 'EPERM'
+            ) {
+              console.warn(
+                `Current working directory not accessible (${fsError.code}): ${currentWorkingDir}, falling back to home directory`
+              );
+              defaultPath = os.homedir();
+            } else {
+              console.warn(
+                `Unexpected filesystem error (${fsError.code}) for directory ${currentWorkingDir}:`,
+                fsError.message
+              );
+              defaultPath = os.homedir();
+            }
+          } else {
+            console.warn(`Unexpected error checking directory ${currentWorkingDir}:`, error);
+            defaultPath = os.homedir();
+          }
         }
       }
     } catch (error) {
