@@ -1,0 +1,84 @@
+# Goose Configuration for Oracle UltraThink
+# This integrates with the existing MCP pool manager
+
+# Provider configuration
+providers:
+  - name: openai
+    type: openai
+    api_key: ${OPENAI_API_KEY}
+    model: gpt-4o
+    temperature: 0.7
+    max_tokens: 4096
+
+# MCP Extensions configuration
+extensions:
+  # UltraThink enhanced memory with Graphiti integration
+  - name: ultrathink
+    type: mcp
+    transport: stdio
+    command: goose
+    args: ["mcp", "ultrathink"]
+    env:
+      GRAPHITI_ENDPOINT: "http://localhost:8123"
+      MEMORY_DIR: "/home/ubuntu/.goose/memory"
+    
+  # Connect to existing MCP servers via pool manager
+  - name: memory-pool
+    type: mcp
+    transport: tcp
+    host: localhost
+    port: 8010
+    
+  - name: sequential-thinking-pool
+    type: mcp
+    transport: tcp  
+    host: localhost
+    port: 8011
+    
+  - name: filesystem-pool
+    type: mcp
+    transport: tcp
+    host: localhost
+    port: 8014
+    
+  - name: playwright-pool
+    type: mcp
+    transport: tcp
+    host: localhost
+    port: 8016
+
+  # Cognee for knowledge graph
+  - name: cognee
+    type: mcp
+    transport: stdio
+    command: uv
+    args: ["--directory", "/home/ubuntu/Development/MCP-Servers/cognee-mcp", "run", "python", "src/server.py"]
+    env:
+      LLM_API_KEY: ${OPENAI_API_KEY}
+      EMBEDDING_API_KEY: ${OPENAI_API_KEY}
+      
+# Session configuration
+session:
+  # Project detection based on working directory
+  project_detect: true
+  project_paths:
+    - path: "/home/ubuntu/Projects/zgdk"
+      name: "zgdk"
+      context: "Discord bot project in Python"
+    - path: "/home/ubuntu/Projects/zagadka"
+      name: "zagadka"
+      context: "Mystery/puzzle project"
+    - path: "/home/ubuntu/Projects/BohtPY"
+      name: "boht"
+      context: "Python bot project"
+      
+# Logging and monitoring
+logging:
+  level: info
+  file: /home/ubuntu/.goose/logs/goose.log
+  
+# Integration with existing hooks
+hooks:
+  pre_start: /home/ubuntu/.claude/hooks/pre-start.sh
+  post_start: /home/ubuntu/.claude/hooks/post-start.sh
+  todo_sync: /home/ubuntu/.claude/hooks/todo-lifecycle/todo-learning-extractor.py
