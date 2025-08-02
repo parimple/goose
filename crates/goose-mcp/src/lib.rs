@@ -12,9 +12,11 @@ mod developer;
 pub mod google_drive;
 mod memory;
 mod tutorial;
+mod ultrathink;
 
 pub use computercontroller::ComputerControllerRouter;
 pub use developer::DeveloperRouter;
 pub use google_drive::GoogleDriveRouter;
 pub use memory::MemoryRouter;
 pub use tutorial::TutorialRouter;
+pub use ultrathink::UltraThinkRouter;

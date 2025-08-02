@@ -1,6 +1,7 @@
 use anyhow::Result;
 use goose_mcp::{
     ComputerControllerRouter, DeveloperRouter, GoogleDriveRouter, MemoryRouter, TutorialRouter,
+    UltraThinkRouter,
 };
 use mcp_server::router::RouterService;
 use mcp_server::{BoundedService, ByteTransport, Server};
@@ -31,6 +32,7 @@ pub async fn run_server(name: &str) -> Result<()> {
         }
         "memory" => Some(Box::new(RouterService(MemoryRouter::new()))),
         "tutorial" => Some(Box::new(RouterService(TutorialRouter::new()))),
+        "ultrathink" => Some(Box::new(RouterService(UltraThinkRouter::new()))),
         _ => None,
     };
 
